@@ -1,0 +1,24 @@
+# 切片设计资产目录
+
+此目录用于存放各切片的 UI 原型和设计说明。
+
+## 目录结构
+
+```
+slices/
+├── S1/                 # 身份→组织→授权→应用可见
+│   ├── login-page.png
+│   ├── app-list.png
+│   └── S1_UI_SPEC.md
+├── S2/                 # 网关→对话→Trace→持久化
+│   ├── chat-page.png
+│   └── S2_UI_SPEC.md
+└── S3/                 # 管理后台→审计
+    ├── admin-dashboard.png
+    └── S3_UI_SPEC.md
+```
+
+## 命名规范
+
+- 图片文件：`{页面名}-{状态}.png`（如 `login-page-error.png`）
+- 规范文档：`S{X}_UI_SPEC.md`

@@ -1,0 +1,1372 @@
+{
+    "metadata": {
+        "product": "AgentifUI",
+        "version": "v1.0",
+        "generated_from": [
+            "PRD.md",
+            "PRD_ADMIN.md"
+        ],
+        "last_updated": "2026-01-26",
+        "description": "Feature List（功能清单）- 完整、稳定的功能全集（SSOT），用于 Roadmap 选择、FRD 编写和 AI 开发执行",
+        "actors_definition": {
+            "User": "普通使用者，使用 AI 应用完成任务",
+            "Manager": "群组管理者，管理团队成员与应用授权",
+            "Tenant Admin": "租户最高治理权限，管理租户内所有资源",
+            "ROOT ADMIN": "平台运维角色，管理租户生命周期（默认关闭）",
+            "System": "系统基础设施能力，无特定用户角色"
+        },
+        "schema_version": "1.1",
+        "scope_definition": {
+            "Platform": "平台级，仅 ROOT ADMIN 可见/可操作",
+            "Tenant": "租户级，Tenant Admin 可配置",
+            "Group": "群组级，Manager 可操作",
+            "User": "用户级，普通用户可操作"
+        },
+        "status_definition": {
+            "v1.0": "v1.0 版本范围内",
+            "v2.0": "v2.0+ 版本范围",
+            "out-of-scope": "明确不做"
+        }
+    },
+    "features": [
+        {
+            "feature_id": "F-ORG-001",
+            "name": "多租户隔离与治理单元",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供 Tenant 作为最高级隔离与治理单元，保障跨租户数据与权限强隔离",
+            "module": "租户与组织",
+            "actors": [
+                "System"
+            ],
+            "notes": "Workspace 为 Tenant UI 别名（1:1）；隔离覆盖用户/群组/对话/执行/统计/审计/策略等"
+        },
+        {
+            "feature_id": "F-ORG-002",
+            "name": "群组组织与成员归属",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "在 Tenant 内提供 Group 组织单元，用于成员组织、授权与配额分配",
+            "module": "租户与组织",
+            "actors": [
+                "System"
+            ],
+            "notes": "Team 为 Group UI 别名（1:1）；单用户可加入多个 Group"
+        },
+        {
+            "feature_id": "F-ORG-003",
+            "name": "多群组成员与管理者绑定",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持同一用户属于多个 Group，并可在多个 Group 担任 Manager",
+            "module": "租户与组织",
+            "actors": [
+                "System"
+            ],
+            "notes": "Manager 权限仅在其绑定 Group 内生效"
+        },
+        {
+            "feature_id": "F-AUTH-001",
+            "name": "多认证方式登录",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可通过密码、手机号、第三方账号或企业 SSO 完成登录",
+            "module": "身份认证",
+            "actors": [
+                "User"
+            ],
+            "notes": "支持邮箱密码/手机号/Google/GitHub/WeChat/CAS/OIDC/SAML/OAuth2"
+        },
+        {
+            "feature_id": "F-AUTH-002",
+            "name": "基于邮箱域名的 SSO 自动识别",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户输入邮箱后自动匹配并推荐对应 Tenant 的 SSO 登录方式",
+            "module": "身份认证",
+            "actors": [
+                "User"
+            ],
+            "notes": "未匹配则展示其他登录方式；≤500ms 返回匹配结果"
+        },
+        {
+            "feature_id": "F-AUTH-003",
+            "name": "JIT 用户创建与入驻",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持 Just-in-time 创建用户并完成租户内账号初始化",
+            "module": "身份认证",
+            "actors": [
+                "System"
+            ],
+            "notes": "常用于 SSO 场景"
+        },
+        {
+            "feature_id": "F-AUTH-004",
+            "name": "用户状态与审核流",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供用户状态体系（待审核/活跃/暂停/拒绝）与审核流程，控制用户可用范围",
+            "module": "身份认证",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "待审核用户可登录但仅能访问个人设置与状态提示；SSO 用户默认自动激活"
+        },
+        {
+            "feature_id": "F-AUTH-005",
+            "name": "密码策略管理",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供可配置的密码复杂度、有效期、历史限制等规则",
+            "module": "身份认证",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "默认≥8位含大小写+数字；支持密码有效期30-365天；历史密码限制3-12个"
+        },
+        {
+            "feature_id": "F-AUTH-006",
+            "name": "MFA（TOTP）与租户级策略",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持 TOTP 多因素认证，并允许租户配置强制/可选/关闭",
+            "module": "身份认证",
+            "actors": [
+                "User",
+                "Tenant Admin"
+            ],
+            "notes": "Admin 可对特定用户强制 MFA，优先级高于 Tenant 级策略"
+        },
+        {
+            "feature_id": "F-AUTH-007",
+            "name": "用户资料与偏好设置",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可管理头像、昵称、语言、时区与主题偏好",
+            "module": "用户体验",
+            "actors": [
+                "User"
+            ],
+            "notes": "Tenant 可配置默认语言；主题可 Tenant 默认 + 用户覆盖"
+        },
+        {
+            "feature_id": "F-AUTH-008",
+            "name": "用户邀请与激活链接",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 通过邮箱邀请用户，系统发送激活链接，用户点击后设置密码并自动激活（跳过审批）",
+            "module": "身份认证",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "邀请链接有效期默认 7 天；过期需重新邀请；事务性邮件属于认证流程，v1.0 支持"
+        },
+        {
+            "feature_id": "F-IAM-001",
+            "name": "角色体系（RBAC）",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供 ROOT ADMIN/Tenant Admin/Manager/User 四级角色，按 Platform/Tenant/Group/User 作用域生效",
+            "module": "权限与治理",
+            "actors": [
+                "System"
+            ],
+            "notes": "ROOT ADMIN 默认关闭，需显式启用"
+        },
+        {
+            "feature_id": "F-IAM-002",
+            "name": "Break-glass 紧急访问机制",
+            "type": "common",
+            "scope": "Platform",
+            "status": "v1.0",
+            "description": "支持运维紧急访问流程并强制留痕审计，用于排障等特殊场景",
+            "module": "权限与治理",
+            "actors": [
+                "ROOT ADMIN"
+            ],
+            "notes": "需填写事由；产生最高级别审计（Severity=Critical）不可删除；系统自动向 Tenant Admin 发送站内信通知（邮件通知为 v2.0+）；访问权限仅在本次会话或1小时内有效"
+        },
+        {
+            "feature_id": "F-IAM-003",
+            "name": "应用访问授权（群组→应用）",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "通过 Group 为成员提供应用访问权限的主路径授权能力",
+            "module": "权限与治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "仅 Tenant Admin 可执行群组→应用授权；授权/撤销即时生效并纳入审计；Manager 用户级授权见 F-MGR-005"
+        },
+        {
+            "feature_id": "F-IAM-004",
+            "name": "用户直授例外授权",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持对个别用户进行应用直授并设置原因与有效期",
+            "module": "权限与治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "需原因+有效期；默认7天，最长90天；到期自动撤销；需审计"
+        },
+        {
+            "feature_id": "F-IAM-005",
+            "name": "授权优先级与显式拒绝",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供稳定的权限判定优先级，显式拒绝优先于任何允许",
+            "module": "权限与治理",
+            "actors": [
+                "System"
+            ],
+            "notes": "优先级：Deny > 用户直授 Allow > 群组授权/Manager用户级授权 Allow（同级） > 默认拒绝；ABAC 仅作为 Allow/Deny 附加条件，不单独产生授权；权限判定 ≤50ms"
+        },
+        {
+            "feature_id": "F-IAM-006",
+            "name": "多群组权限合并与归因",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持访问权限并集，并将配额/扣费归因到当前工作群组",
+            "module": "权限与治理",
+            "actors": [
+                "System"
+            ],
+            "notes": "扣费群组必须是授予该 App 访问权的群组之一；选择机制：默认上次使用群组（本地持久化）、顶部导航 Group Switcher、API Header X-Active-Group-ID；单群组用户隐藏切换器"
+        },
+        {
+            "feature_id": "F-IAM-007",
+            "name": "内容可见性边界",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "定义并强制执行对话/统计/隐私的可见范围边界",
+            "module": "权限与治理",
+            "actors": [
+                "System"
+            ],
+            "notes": "User仅可查看自己对话；Manager可见团队统计与用户级指标排行（仅指标），数据范围严格限制为当前 Group 上下文产生的数据，不可查看成员对话内容/摘要；Tenant Admin查看成员对话需事由+审计"
+        },
+        {
+            "feature_id": "F-IAM-008",
+            "name": "智能上下文切换",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可见所有有权访问的应用（并集），点击应用时系统自动或提示用户切换群组上下文",
+            "module": "权限与治理",
+            "actors": [
+                "User"
+            ],
+            "notes": "若当前 Context 已授权则直接进入；若未授权且仅属一个有效群组则自动切换；若属多个有效群组则弹窗选择"
+        },
+        {
+            "feature_id": "F-QUOTA-001",
+            "name": "多层级配额管理",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供租户/群组/用户三级配额限制与统一执行",
+            "module": "配额与成本",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "Tenant 总上限不可突破；应用级配额为 v2.0+ 范围；配额重置周期默认自然月（Tenant 可配置为自然周）"
+        },
+        {
+            "feature_id": "F-QUOTA-002",
+            "name": "Token 计量与计费口径",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持按输入+输出 Token（默认）计量，并允许企业配置按请求计量",
+            "module": "配额与成本",
+            "actors": [
+                "System"
+            ],
+            "notes": "usage-based 归因；报表维度需包含 Model"
+        },
+        {
+            "feature_id": "F-QUOTA-003",
+            "name": "配额超限拦截",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "达到配额限制时拒绝新请求并给出可解释反馈",
+            "module": "配额与成本",
+            "actors": [
+                "System"
+            ],
+            "notes": "既有请求可按规则完成执行"
+        },
+        {
+            "feature_id": "F-QUOTA-004",
+            "name": "配额阈值告警",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供配额阈值（80%/90%/100%）告警，并向用户/Manager/Admin 分发通知",
+            "module": "配额与成本",
+            "actors": [
+                "User",
+                "Manager",
+                "Tenant Admin"
+            ],
+            "notes": "站内通知必选；Webhook 可选；告警延迟 ≤5 分钟"
+        },
+        {
+            "feature_id": "F-COST-001",
+            "name": "成本估算与价格表配置",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "基于模型价格表进行成本估算，并支持租户覆盖价格与币种/税费视图",
+            "module": "配额与成本",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "历史成本按历史价格计算不追溯"
+        },
+        {
+            "feature_id": "F-APP-001",
+            "name": "AI 应用目录与选择入口",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可在统一入口选择不同 AI 应用并开始交互或执行",
+            "module": "应用中心",
+            "actors": [
+                "User"
+            ],
+            "notes": "应用类型覆盖 Chatbot/Chatflow/Agent；应用可被禁用/删除但历史只读保留"
+        },
+        {
+            "feature_id": "F-APP-002",
+            "name": "运行 Agent/Workflow",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可运行对接平台的 Agent/Workflow，并在统一 UI 查看状态与结果",
+            "module": "运行与执行",
+            "actors": [
+                "User"
+            ],
+            "notes": "不提供创建/编辑/发布编排能力；可提供深链跳转到编排平台"
+        },
+        {
+            "feature_id": "F-APP-003",
+            "name": "RAG 引用结果展示",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "在对话中统一展示后端返回的检索引用信息（来源、页码、相关度等）",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "若后端返回不应可见引用，前端默认原样展示（边界声明）"
+        },
+        {
+            "feature_id": "F-APP-004",
+            "name": "应用发现与工作台",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供应用发现页面，支持分类浏览（类型/标签）、搜索，以及工作台布局（最近使用/我的收藏/全部应用）",
+            "module": "应用中心",
+            "actors": [
+                "User"
+            ],
+            "notes": "应用卡片展示图标/名称/简介/类型标签；用户可收藏常用应用"
+        },
+        {
+            "feature_id": "F-CHAT-001",
+            "name": "实时文本对话",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可进行多轮实时对话交互并获取 AI 回复",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "统一体验屏蔽底层平台差异；首 Token 时间 P95 ≤1.5s"
+        },
+        {
+            "feature_id": "F-CHAT-002",
+            "name": "流式响应展示",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "支持以流式方式展示生成内容，提升响应体感",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "与停止生成联动"
+        },
+        {
+            "feature_id": "F-CHAT-003",
+            "name": "数学公式渲染",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "在对话内容中支持 LaTeX 数学公式渲染展示",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "作为统一体验的一部分"
+        },
+        {
+            "feature_id": "F-CHAT-004",
+            "name": "AI 推荐下一问题",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "在对话中提供下一步问题建议以提升完成任务效率",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "以用户可感知的推荐形式呈现"
+        },
+        {
+            "feature_id": "F-CHAT-005",
+            "name": "停止生成",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "用户可停止生成；后端支持则取消执行，否则停止渲染并提示风险",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "必须可追溯审计；软停需提示\"后端仍可能执行\"；点击后 ≤500ms 停止渲染"
+        },
+        {
+            "feature_id": "F-CHAT-006",
+            "name": "对话会话管理",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供对话列表与会话级管理能力（搜索、重命名、删除、固定、归档/分组等）",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "仅关注会话维度管理"
+        },
+        {
+            "feature_id": "F-CHAT-007",
+            "name": "对话只读分享链接",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "生成可撤销的只读分享链接并按可见范围进行访问控制",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "可见范围：启用登录（默认）时仅同 Tenant/同 Group 可见；关闭登录则为公开链接；默认永久有效直至撤销，Tenant 可配置有效期"
+        },
+        {
+            "feature_id": "F-CHAT-008",
+            "name": "消息交互与反馈",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供消息维度的交互能力，包括复制、编辑重发、重新生成、赞/踩反馈等",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "关注气泡与内容交互维度"
+        },
+        {
+            "feature_id": "F-FILE-001",
+            "name": "文件上传/下载/预览",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "支持在对话/执行中上传文件并下载或预览结果文件",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "明确不做网盘；单文件默认50MB（可配≤200MB）；单次默认10个（可配≤20个）；保留期默认90天；默认文档/图片/音视频类型白名单（可配）；50MB文件上传 P95 ≤10s；配置层级：Tenant 级默认值 → 应用级可覆盖（仅可收紧，不可放宽）"
+        },
+        {
+            "feature_id": "F-ART-001",
+            "name": "Artifacts 产物管理与预览",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "将代码/文档/可视化从对话中抽离为可管理产物，并支持版本化与下载导出",
+            "module": "Artifacts",
+            "actors": [
+                "User"
+            ],
+            "notes": "每次输出自动生成草稿版本，用户显式保存生成稳定版本；草稿保留最近10个超出自动清理；稳定版本留存受 Tenant 策略约束；可执行内容预览以安全为先（沙箱，Tenant 可控）"
+        },
+        {
+            "feature_id": "F-HITL-001",
+            "name": "Human-in-the-loop 结构化交互",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "支持确认/选择/审批/补充信息等受控交互，并回传用户选择结果",
+            "module": "对话系统",
+            "actors": [
+                "User"
+            ],
+            "notes": "前端只渲染与回传；协议 schema 统一且来自后端结构化输出；不扩展为低代码编排"
+        },
+        {
+            "feature_id": "F-DATA-001",
+            "name": "会话与执行数据本地持久化",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "平台本地持久化会话与执行数据以支撑历史、统计与审计",
+            "module": "数据管理",
+            "actors": [
+                "System"
+            ],
+            "notes": "默认永久保存；应用删除后历史只读保留并标识\"已删除/不可用\"；数据删除优先级：用户自删对话即时生效（保留删除事件）、Admin删用户30天冷静期后脱敏保留、ROOT删租户即时标记延迟清理；审计日志即使租户删除仍需保留至少180天（法务最短保留期）"
+        },
+        {
+            "feature_id": "F-DATA-002",
+            "name": "数据回源同步与降级",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持在本地缺失、用户请求或管理员校验时向后端回源同步，并在失败时降级展示",
+            "module": "数据管理",
+            "actors": [
+                "System"
+            ],
+            "notes": "回源失败展示本地已有数据并提示不完整"
+        },
+        {
+            "feature_id": "F-RUN-001",
+            "name": "Run 类型统一入口",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "为 Workflow Run/Agent Run/Generation Run 提供一致的运行记录入口与展示体验",
+            "module": "运行与执行",
+            "actors": [
+                "User"
+            ],
+            "notes": "统一可进入状态/耗时/Token/失败原因等信息页"
+        },
+        {
+            "feature_id": "F-RUN-002",
+            "name": "执行状态展示",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "展示待处理/运行中/已完成/失败/已停止等状态并及时更新",
+            "module": "运行与执行",
+            "actors": [
+                "User"
+            ],
+            "notes": "面向用户的状态可解释呈现；状态变更 ≤3s 反映到 UI"
+        },
+        {
+            "feature_id": "F-RUN-003",
+            "name": "执行详情与失败原因呈现",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供步骤数、耗时、Token 使用量、失败原因等执行详情展示",
+            "module": "运行与执行",
+            "actors": [
+                "User"
+            ],
+            "notes": "作为统一观测与追溯入口的一部分"
+        },
+        {
+            "feature_id": "F-GW-001",
+            "name": "OpenAI API 兼容的统一调用入口",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "对前端提供 OpenAI 风格的统一调用接口，屏蔽后端平台差异",
+            "module": "网关与集成",
+            "actors": [
+                "System"
+            ],
+            "notes": "兼容范围以\"最小可用集合\"为承诺边界（对话+流式+最小工具调用）；不承诺全量 OpenAI 能力"
+        },
+        {
+            "feature_id": "F-GW-002",
+            "name": "统一错误处理与响应结构一致性",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供一致的请求/响应/错误语义，提升跨平台一致体验与可观测性",
+            "module": "网关与集成",
+            "actors": [
+                "System"
+            ],
+            "notes": "面向前端呈现为可解释错误提示"
+        },
+        {
+            "feature_id": "F-GW-003",
+            "name": "会话主键统一生成与映射管理",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "平台统一生成会话主键，并维护与后端平台会话/执行标识的映射关系",
+            "module": "网关与集成",
+            "actors": [
+                "System"
+            ],
+            "notes": "不承诺跨平台可续聊迁移"
+        },
+        {
+            "feature_id": "F-GW-004",
+            "name": "能力降级与只读可用性保障",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "在后端不支持或不可用时提供明确降级体验，并保证历史/统计/审计等只读能力可用",
+            "module": "可靠性与降级",
+            "actors": [
+                "System"
+            ],
+            "notes": "覆盖引用/stop/工具调用/编排平台不可用等场景；生成入口需明确不可用提示"
+        },
+        {
+            "feature_id": "F-GW-005",
+            "name": "身份与凭证传递边界",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "定义前端→网关与网关→后端的身份/凭证传递规则，确保审计可关联",
+            "module": "网关与集成",
+            "actors": [
+                "System"
+            ],
+            "notes": "默认不透传用户在后端的 access_token"
+        },
+        {
+            "feature_id": "F-OBS-001",
+            "name": "Trace ID 全链路关联与展示",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "为每次 Run/请求提供 Trace 标识并在 UI 展示以支持追踪排障",
+            "module": "观测与追踪",
+            "actors": [
+                "User",
+                "Tenant Admin"
+            ],
+            "notes": "Trace ID 由网关生成贯穿；格式兼容 OpenTelemetry/W3C traceparent；UI 支持复制"
+        },
+        {
+            "feature_id": "F-OBS-002",
+            "name": "外部观测平台跳转",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持配置外部观测平台 URL 模板并从运行记录一键跳转",
+            "module": "观测与追踪",
+            "actors": [
+                "User",
+                "Tenant Admin"
+            ],
+            "notes": "全局默认 + Tenant 覆盖；未配置则仅提供复制 Trace"
+        },
+        {
+            "feature_id": "F-SEC-001",
+            "name": "提示词注入检测策略",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供注入风险检测与可配置处置策略（记录/告警/拦截）",
+            "module": "安全与合规",
+            "actors": [
+                "System",
+                "Tenant Admin"
+            ],
+            "notes": "默认记录+告警；Tenant 可配置拦截"
+        },
+        {
+            "feature_id": "F-SEC-002",
+            "name": "会话隔离与应用上下文隔离",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供用户之间会话隔离与应用之间上下文隔离，避免串话与跨域引用",
+            "module": "安全与合规",
+            "actors": [
+                "System"
+            ],
+            "notes": "不启用跨应用引用历史/统一记忆（边界声明）"
+        },
+        {
+            "feature_id": "F-SEC-003",
+            "name": "PII 去敏配置",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持租户级（及可扩展的应用级）PII 去敏配置，控制日志与导出等扩散环节",
+            "module": "安全与合规",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "v1.0 为不可还原去敏；追溯关联为 v2.0+ 范围；敏感字段检出率 ≥95%"
+        },
+        {
+            "feature_id": "F-SEC-004",
+            "name": "输出内容合规检测与拦截",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持租户级输出合规策略配置，并对违规输出进行处置",
+            "module": "安全与合规",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "与审计事件联动，形成可追溯闭环"
+        },
+        {
+            "feature_id": "F-AUDIT-001",
+            "name": "审计日志采集",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "对鉴权、权限变更、高风险访问、治理安全、后台管理等事件进行审计记录",
+            "module": "审计与合规",
+            "actors": [
+                "System"
+            ],
+            "notes": "关键事件不可关闭；字段含操作者/对象/动作/结果/IP/UA/事由/Trace 等；写入延迟 ≤5s"
+        },
+        {
+            "feature_id": "F-AUDIT-002",
+            "name": "审计日志不可篡改与权限控制",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "审计日志在产品层不可编辑不可删除，并按角色严格控制可见与导出",
+            "module": "审计与合规",
+            "actors": [
+                "System",
+                "Tenant Admin"
+            ],
+            "notes": "支持租户级保留期配置（默认180天、最长7年）"
+        },
+        {
+            "feature_id": "F-AUDIT-003",
+            "name": "高风险访问事由记录",
+            "type": "common",
+            "scope": "Platform",
+            "status": "v1.0",
+            "description": "对查看/导出他人对话、break-glass 等高风险行为要求事由并增强审计记录",
+            "module": "审计与合规",
+            "actors": [
+                "Tenant Admin",
+                "ROOT ADMIN"
+            ],
+            "notes": "强制留痕与可追溯"
+        },
+        {
+            "feature_id": "F-OPEN-001",
+            "name": "平台 Open API",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "对企业系统提供用户/群组、对话与执行、统计与配额等 API 查询与集成能力",
+            "module": "开放平台",
+            "actors": [
+                "System"
+            ],
+            "notes": "用户态 OAuth2/OIDC；系统态 API Key；最小权限范围与可审计"
+        },
+        {
+            "feature_id": "F-OPEN-002",
+            "name": "Webhook 事件订阅与投递",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持执行完成、安全/合规事件、配额告警等事件推送，并可观测投递结果",
+            "module": "开放平台",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "需签名校验、有限重试退避、幂等标识、失败可重放；首次投递 P95 ≤30s，3次重试成功率 ≥99%"
+        },
+        {
+            "feature_id": "F-I18N-001",
+            "name": "多语言（中文/英文）",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供中英文界面，并按用户偏好与租户默认语言生效",
+            "module": "用户体验",
+            "actors": [
+                "User"
+            ],
+            "notes": "不提供租户强制语言与内容运营体系（边界声明）"
+        },
+        {
+            "feature_id": "F-BRAND-001",
+            "name": "主题与品牌定制",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持租户级品牌配置（主色/辅色/Logo/站点信息/登录页基础元素）并与用户偏好协同生效",
+            "module": "用户体验",
+            "actors": [
+                "User",
+                "Tenant Admin"
+            ],
+            "notes": "不包含自定义域名白标与登录页布局级定制（边界声明）"
+        },
+        {
+            "feature_id": "F-A11Y-001",
+            "name": "基础可访问性支持",
+            "type": "common",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供基础键盘操作与通用可访问性要求支持",
+            "module": "用户体验",
+            "actors": [
+                "User"
+            ],
+            "notes": "作为平台通用能力长期存在"
+        },
+        {
+            "feature_id": "F-NOTIF-001",
+            "name": "站内通知中心",
+            "type": "business",
+            "scope": "User",
+            "status": "v1.0",
+            "description": "提供站内通知以承载配额告警、审批结果与系统公告",
+            "module": "用户体验",
+            "actors": [
+                "User"
+            ],
+            "notes": "通知保留期默认 90 天；邮件/短信为 v2.0+ 范围"
+        },
+        {
+            "feature_id": "F-NOTIF-002",
+            "name": "平台/租户系统公告广播",
+            "type": "business",
+            "scope": "Platform",
+            "status": "v1.0",
+            "description": "支持面向全员的系统维护公告/紧急通知展示（Banner/弹窗）",
+            "module": "用户体验",
+            "actors": [
+                "User",
+                "Tenant Admin",
+                "ROOT ADMIN"
+            ],
+            "notes": "与后台配置联动，作为稳定能力存在"
+        },
+        {
+            "feature_id": "F-REL-001",
+            "name": "高可用与无单点部署",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持前端与网关多副本部署与滚动升级，避免单点影响核心链路",
+            "module": "可靠性与运维",
+            "actors": [
+                "System"
+            ],
+            "notes": "外部编排不可用时保证只读能力可用（历史/统计/审计）；平台月度可用性 ≥99.9%"
+        },
+        {
+            "feature_id": "F-REL-002",
+            "name": "关键体验与性能指标承诺",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供对话 TTFT、页面操作延迟、告警延迟等可验收体验指标作为产品承诺",
+            "module": "可靠性与运维",
+            "actors": [
+                "System"
+            ],
+            "notes": "简单交互 P95 ≤300ms；复杂列表 P95 ≤800ms；AgentifUI 自身新增开销 P95 ≤200ms"
+        },
+        {
+            "feature_id": "F-REL-003",
+            "name": "规模容量承诺",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "平台承诺单 Tenant 规模与并发容量指标，支撑企业级部署",
+            "module": "可靠性与运维",
+            "actors": [
+                "System"
+            ],
+            "notes": "单 Tenant ≥5万用户；同时在线 ≥1000；活跃交互并发 ≥300；流式连接并发 ≥500"
+        },
+        {
+            "feature_id": "F-REL-004",
+            "name": "数据备份与恢复策略",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供平台级每日全量备份与租户级数据导出能力，支撑数据安全与灾备恢复",
+            "module": "可靠性与运维",
+            "actors": [
+                "System",
+                "Tenant Admin"
+            ],
+            "notes": "平台级：每日全量备份，保留7天，RPO ≤24h，RTO ≤4h；租户级：支持手动导出关键数据（对话/审计/配置）用于本地归档"
+        },
+        {
+            "feature_id": "F-UX-001",
+            "name": "响应式适配策略",
+            "type": "common",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "定义用户端与管理后台的响应式布局边界，保障核心体验与治理效率",
+            "module": "用户体验",
+            "actors": [
+                "User",
+                "Tenant Admin"
+            ],
+            "notes": "用户端 Chat 界面支持移动端适配；其他用户页面 PC 优先；管理后台仅支持 PC 端（Min-width: 1024px）"
+        },
+        {
+            "feature_id": "F-ADMIN-PLAT-001",
+            "name": "租户生命周期管理",
+            "type": "business",
+            "scope": "Platform",
+            "status": "v1.0",
+            "description": "ROOT ADMIN 在平台范围管理 Tenant 的全生命周期（列表/创建/编辑/启停/删除）",
+            "module": "管理后台·平台管理",
+            "actors": [
+                "ROOT ADMIN"
+            ],
+            "notes": "删除为高危操作需二次确认+强制审计；默认禁止查看租户业务内容；租户创建后 ≤30s 可正常使用；租户禁用后即时生效，所有会话强制登出"
+        },
+        {
+            "feature_id": "F-ADMIN-PLAT-002",
+            "name": "租户级总配额上限配置",
+            "type": "business",
+            "scope": "Platform",
+            "status": "v1.0",
+            "description": "支持为 Tenant 配置 Token/成本上限以实现平台级治理",
+            "module": "管理后台·平台管理",
+            "actors": [
+                "ROOT ADMIN"
+            ],
+            "notes": "与租户内配额体系协同"
+        },
+        {
+            "feature_id": "F-ADMIN-PLAT-003",
+            "name": "平台全局配置",
+            "type": "business",
+            "scope": "Platform",
+            "status": "v1.0",
+            "description": "配置新租户默认策略与平台级全局参数（默认认证/安全模板/观测平台/维护公告）",
+            "module": "管理后台·平台管理",
+            "actors": [
+                "ROOT ADMIN"
+            ],
+            "notes": "面向平台治理稳定存在"
+        },
+        {
+            "feature_id": "F-ADMIN-USER-001",
+            "name": "用户管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 管理租户内用户全生命周期（列表/详情/邀请/审批/状态/删除）",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "用户删除为高危操作需软删除保留审计关联；新用户默认无群组（Unassigned），需管理员邀请或分配至具体 Group 方可使用业务功能；查看成员对话需填写事由并自动生成审计日志"
+        },
+        {
+            "feature_id": "F-ADMIN-USER-002",
+            "name": "账号安全管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 可对用户安全能力进行管理（重置密码/强制MFA/资料受限编辑）",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "安全操作需审计"
+        },
+        {
+            "feature_id": "F-ADMIN-GROUP-001",
+            "name": "群组管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 管理租户内组织结构（创建/编辑/删除群组/成员增删/指派Manager）",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "成员移除仅解除关系；权限即时生效；支持批量添加（单次≤100人）；群组删除为高危操作需二次确认+审计，成员移至 Unassigned，历史数据只读保留"
+        },
+        {
+            "feature_id": "F-ADMIN-APP-001",
+            "name": "应用管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 注册 AI 应用并配置后端连接与应用元信息（注册/编辑/启停/删除/凭证管理）",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "应用禁用后历史可读不可新发起；删除后历史只读保留并标记；凭证加密存储；支持 tags 用途标签用于应用发现分类浏览；支持应用级文件上传/合规策略配置（仅可在 Tenant 级限制内收紧，不可放宽）"
+        },
+        {
+            "feature_id": "F-ADMIN-APP-002",
+            "name": "应用授权管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置应用对哪些群组可见与可用",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "与群组→应用授权能力一致，提供后台管理入口"
+        },
+        {
+            "feature_id": "F-ADMIN-AUTHZ-001",
+            "name": "授权管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 管理授权关系与直授例外（群组授权/用户直授/批量授权/撤销/直授记录）",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "直授到期自动撤销；撤销即时生效"
+        },
+        {
+            "feature_id": "F-ADMIN-QUOTA-001",
+            "name": "配额管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置多层级配额（Tenant/Group/User）并查看全量使用情况",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "与告警配置联动；超限准入规则一致"
+        },
+        {
+            "feature_id": "F-ADMIN-QUOTA-002",
+            "name": "配额告警配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置配额告警阈值及通知分发规则",
+            "module": "管理后台·租户治理",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "站内通知必选；Webhook 可选"
+        },
+        {
+            "feature_id": "F-ADMIN-ANALYTICS-001",
+            "name": "统计与报表",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 查看租户维度的使用、成本、趋势（仪表盘/排行/维度分析）并导出报表",
+            "module": "管理后台·统计分析",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "维度含 Tenant/Group/User/App/Model；导出 CSV/Excel；数据延迟 ≤5分钟"
+        },
+        {
+            "feature_id": "F-ADMIN-SEC-001",
+            "name": "安全与合规策略配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置租户安全与合规策略（认证/SSO/MFA/注入检测/PII/输出合规）并监控安全事件",
+            "module": "管理后台·安全合规",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "策略生效 ≤1分钟；安全事件展示 ≤1分钟延迟"
+        },
+        {
+            "feature_id": "F-ADMIN-AUDIT-001",
+            "name": "审计日志查询与详情查看",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 可按多条件检索审计日志并查看完整字段以支持追溯",
+            "module": "管理后台·审计",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "覆盖鉴权/权限/资源/配额/安全/高风险访问等事件类别；30天内查询 P95 ≤2s"
+        },
+        {
+            "feature_id": "F-ADMIN-AUDIT-002",
+            "name": "审计日志导出与保留期配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "支持导出审计日志并配置保留期以满足合规要求",
+            "module": "管理后台·审计",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "导出行为本身需审计；保留期默认180天、最长7年；10万条导出 ≤30s"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-001",
+            "name": "租户基础信息设置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置组织名称、描述与联系信息等基础资料",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "作为长期稳定能力存在"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-002",
+            "name": "品牌与主题设置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置主色/辅色/Logo/Favicon/站点名/登录页元素等品牌项",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "与前台主题能力协同（Tenant 默认 + 用户覆盖）"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-003",
+            "name": "多语言默认与用户覆盖策略",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置新用户默认语言以及是否允许用户自行覆盖",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "支持中文/英文"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-004",
+            "name": "Webhook 配置与投递日志查看",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置 Webhook 端点/订阅事件/签名密钥，并查看投递记录",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "与 Webhook 事件订阅与投递能力一致"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-005",
+            "name": "外部观测平台配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置观测平台类型与 Trace 跳转 URL 模板",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "与运行记录页一键跳转联动"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-006",
+            "name": "通知配置与保留期",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置站内通知开关、系统广播样式与通知保留期",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "通知类型覆盖配额告警/审批结果/系统公告"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-007",
+            "name": "系统公告管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 创建/发布/结束/查看公告历史，支持 Banner 和模态弹窗展示方式",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "支持即时发布或定时发布；模态弹窗用于紧急通知首次登录强制展示"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-008",
+            "name": "保留策略汇总视图",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "提供统一视图展示各类数据保留期配置（文件/通知/审计日志），便于合规人员一站式审查",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "聚合各模块保留期配置入口"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-009",
+            "name": "Tenant 级文件上传策略配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置文件上传默认策略（单文件大小/类型白名单/单次数量/保留期），应用级可收紧不可放宽",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "单文件默认 50MB 可配 ≤200MB；单次默认 10 个可配 ≤20 个；保留期默认 90 天可配 30 天~永久；默认文档/图片/音视频类型白名单（可配）"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-010",
+            "name": "对话分享策略配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置对话分享链接的默认有效期、最长有效期及是否强制登录查看",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "默认永久有效（0）；最长有效期默认 365 天（仅对非永久分享生效）；启用登录时仅同 Tenant/同群组可见，关闭时为公开链接"
+        },
+        {
+            "feature_id": "F-ADMIN-SETTINGS-011",
+            "name": "API Key 管理",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 创建/撤销 API Key，配置授权范围与过期时间，查看使用统计",
+            "module": "管理后台·系统设置",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "单 Tenant 最多 20 个 API Key；Key 仅创建时展示一次；撤销后立即失效"
+        },
+        {
+            "feature_id": "F-ADMIN-COST-001",
+            "name": "成本估算配置",
+            "type": "business",
+            "scope": "Tenant",
+            "status": "v1.0",
+            "description": "Tenant Admin 配置模型计价与展示口径（价格表/币种/税费视图）以支撑成本报表",
+            "module": "管理后台·配额与成本",
+            "actors": [
+                "Tenant Admin"
+            ],
+            "notes": "租户可覆盖平台内置价格表；历史成本不追溯"
+        },
+        {
+            "feature_id": "F-MGR-001",
+            "name": "团队成员管理",
+            "type": "business",
+            "scope": "Group",
+            "status": "v1.0",
+            "description": "Manager 在其管理的 Group 内添加/移除成员并即时生效权限",
+            "module": "管理后台·团队管理",
+            "actors": [
+                "Manager"
+            ],
+            "notes": "数据与权限严格限制在所管理 Group"
+        },
+        {
+            "feature_id": "F-MGR-002",
+            "name": "团队应用授权管理",
+            "type": "business",
+            "scope": "Group",
+            "status": "v1.0",
+            "description": "Manager 管理本 Group 可访问的应用授权（按权限边界）",
+            "module": "管理后台·团队管理",
+            "actors": [
+                "Manager"
+            ],
+            "notes": "不包含跨组授权与用户直授例外（由 Tenant Admin 管控）；限于 Tenant Admin 已授权给该 Group 的应用范围内"
+        },
+        {
+            "feature_id": "F-MGR-003",
+            "name": "团队配额使用查看",
+            "type": "business",
+            "scope": "Group",
+            "status": "v1.0",
+            "description": "Manager 查看本 Group 的配额使用情况与趋势",
+            "module": "管理后台·团队管理",
+            "actors": [
+                "Manager"
+            ],
+            "notes": "仅查看，不配置"
+        },
+        {
+            "feature_id": "F-MGR-004",
+            "name": "团队统计报表",
+            "type": "business",
+            "scope": "Group",
+            "status": "v1.0",
+            "description": "Manager 查看本 Group 维度的使用、成本、趋势与排行并可导出",
+            "module": "管理后台·统计分析",
+            "actors": [
+                "Manager"
+            ],
+            "notes": "可见用户级指标排行（仅指标，不含对话内容）；严禁聚合展示用户跨组或个人空间行为数据；不可查看成员对话内容/摘要"
+        },
+        {
+            "feature_id": "F-MGR-005",
+            "name": "群组内用户级授权",
+            "type": "business",
+            "scope": "Group",
+            "status": "v1.0",
+            "description": "Manager 在 Tenant Admin 已授权给其 Group 的应用范围内，为具体成员分配用户级授权",
+            "module": "管理后台·团队管理",
+            "actors": [
+                "Manager"
+            ],
+            "notes": "与用户直授不同：依托群组授权范围，无有效期限制（跟随群组生命周期）；可选填写授权原因；纳入审计"
+        }
+    ]
+}
