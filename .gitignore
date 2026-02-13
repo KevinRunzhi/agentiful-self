@@ -1,0 +1,82 @@
+# Agentiful - Build Output
+dist/
+build/
+.next/
+out/
+.turbo/
+
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Environment
+.env
+.env*.local
+.env.*.local
+.env.production
+
+# Database
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+ # IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Temporary
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# Docker
+docker/data/
+docker/logs/
+
+# Redis
+dump.rdb
+
+# Misc
+*.pid
+*.seed
+*.pid.lock
+.tsbuildinfo
+
+nul

@@ -1,0 +1,43 @@
+{
+  "name": "agentiful",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Agentiful - Multi-tenant AI agent platform",
+  "scripts": {
+    "dev": "pnpm --filter \"./apps/**\" dev",
+    "build": "pnpm -r --filter \"./apps/**\" build",
+    "test": "vitest",
+    "test:e2e": "playwright test",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "db:generate": "pnpm --filter @agentifui/db db:generate",
+    "db:migrate": "pnpm --filter @agentifui/db db:migrate",
+    "db:studio": "pnpm --filter @agentifui/db db:studio",
+    "typecheck": "tsc --noEmit",
+    "validate:rbac": "tsx scripts/validate-rbac-quickstart.ts"
+  },
+  "keywords": [
+    "multi-tenant",
+    "ai",
+    "agents",
+    "authentication"
+  ],
+  "author": "Agentiful Team",
+  "license": "PROPRIETARY",
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "oxlint": "^0.10.0",
+    "typescript": "^5.8.0",
+    "vitest": "^2.1.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(SPECIFY_FEATURE=1-multi-tenant-auth powershell:*)",
+      "Bash(pwsh:*)",
+      "Bash(if:*)",
+      "Bash(then pwsh -File .specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks)",
+      "Bash(else echo '{\"\"feature_dir\"\": \"\"\"\", \"\"available_docs\"\": []}')",
+      "Bash(fi:*)",
+      "Bash(pnpm install:*)",
+      "Bash(cat:*)",
+      "Bash(pnpm add:*)",
+      "Bash(awk:*)",
+      "Bash(python3:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File .specify/scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks)"
+    ]
+  }
+}

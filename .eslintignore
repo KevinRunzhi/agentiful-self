@@ -1,0 +1,13 @@
+dist/
+build/
+.next/
+out/
+.turbo/
+node_modules/
+coverage/
+playwright-report/
+test-results/
+*.log
+.env*
+.d.ts
+*.min.js
