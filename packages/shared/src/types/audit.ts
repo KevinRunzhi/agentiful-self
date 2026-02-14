@@ -12,10 +12,17 @@ export interface AuditEvent {
   tenantId: string | null;
   actorUserId: string | null;
   actorType: ActorType;
+  actorRole?: string | null;
+  eventCategory?: AuditEventCategory | null;
+  eventType?: string | null;
   action: AuditAction | string;
   resourceType: string | null;
   resourceId: string | null;
+  targetType?: string | null;
+  targetId?: string | null;
   result: AuditResult;
+  severity?: AuditSeverity | null;
+  reason?: string | null;
   errorMessage: string | null;
   ipAddress: string | null;
   userAgent: string | null;
@@ -28,6 +35,15 @@ export interface AuditEvent {
  * Actor type
  */
 export type ActorType = "user" | "system" | "admin";
+
+export type AuditEventCategory =
+  | "authentication"
+  | "authorization"
+  | "data_access"
+  | "management_change"
+  | "security_event";
+
+export type AuditSeverity = "low" | "medium" | "high" | "critical";
 
 /**
  * Audit result
@@ -60,7 +76,33 @@ export type AuditAction =
   | "group.update"
   | "group.delete"
   | "group.member.add"
-  | "group.member.remove";
+  | "group.member.remove"
+  | "auth.login.success"
+  | "auth.login.failure"
+  | "auth.logout"
+  | "auth.mfa.enabled"
+  | "auth.mfa.disabled"
+  | "auth.password.changed"
+  | "auth.password.reset"
+  | "authz.role.assigned"
+  | "authz.role.revoked"
+  | "authz.app.granted"
+  | "authz.app.revoked"
+  | "authz.policy.updated"
+  | "access.conversation.viewed"
+  | "access.conversation.exported"
+  | "access.audit.exported"
+  | "access.breakglass"
+  | "gov.pii.detected"
+  | "gov.pii.masked"
+  | "gov.content.blocked"
+  | "gov.injection.detected"
+  | "gov.quota.warning"
+  | "gov.quota.exceeded"
+  | "admin.tenant.updated"
+  | "admin.user.created"
+  | "admin.group.updated"
+  | "admin.app.updated";
 
 /**
  * Audit log filters
@@ -69,8 +111,13 @@ export interface AuditLogFilters {
   tenantId?: string;
   userId?: string;
   action?: AuditAction | string;
+  eventCategory?: AuditEventCategory;
+  eventType?: string;
   resourceType?: string;
+  targetType?: string;
+  targetId?: string;
   result?: AuditResult;
+  severity?: AuditSeverity;
   startDate?: Date;
   endDate?: Date;
   limit?: number;
@@ -103,10 +150,17 @@ export interface CreateAuditEvent {
   tenantId?: string;
   actorUserId?: string;
   actorType: ActorType;
+  actorRole?: string;
+  eventCategory?: AuditEventCategory;
+  eventType?: string;
   action: AuditAction | string;
   resourceType?: string;
   resourceId?: string;
+  targetType?: string;
+  targetId?: string;
   result: AuditResult;
+  severity?: AuditSeverity;
+  reason?: string;
   errorMessage?: string;
   ipAddress?: string;
   userAgent?: string;

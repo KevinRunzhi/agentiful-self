@@ -7,7 +7,41 @@
 import type { AuditEvent, CreateAuditEvent, AuditResult, ActorType } from "@agentifui/shared/types";
 import { getDatabase } from "@agentifui/db/client";
 import { auditEvent } from "@agentifui/db/schema";
+import { desc, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
+
+function inferEventCategory(action: string): CreateAuditEvent["eventCategory"] {
+  if (action.startsWith("auth.")) return "authentication";
+  if (action.startsWith("authz.")) return "authorization";
+  if (action.startsWith("access.")) return "data_access";
+  if (action.startsWith("gov.")) return "security_event";
+  if (action.startsWith("admin.")) return "management_change";
+  return undefined;
+}
+
+function inferSeverity(action: string, current?: CreateAuditEvent["severity"]): CreateAuditEvent["severity"] {
+  if (current) {
+    return current;
+  }
+
+  if (
+    action.includes("breakglass") ||
+    action.includes("blocked") ||
+    action.includes("exceeded")
+  ) {
+    return "critical";
+  }
+
+  if (action.includes("failure") || action.includes("denied")) {
+    return "high";
+  }
+
+  if (action.startsWith("gov.")) {
+    return "medium";
+  }
+
+  return "low";
+}
 
 /**
  * Audit service
@@ -26,10 +60,17 @@ export class AuditService {
         tenantId: data.tenantId,
         actorUserId: data.actorUserId,
         actorType: data.actorType,
+        actorRole: data.actorRole,
+        eventCategory: data.eventCategory ?? inferEventCategory(data.action),
+        eventType: data.eventType ?? data.action,
         action: data.action,
         resourceType: data.resourceType,
         resourceId: data.resourceId,
+        targetType: data.targetType,
+        targetId: data.targetId,
         result: data.result,
+        severity: inferSeverity(data.action, data.severity),
+        reason: data.reason,
         errorMessage: data.errorMessage,
         ipAddress: data.ipAddress,
         userAgent: data.userAgent,
@@ -102,7 +143,7 @@ export class AuditService {
       .select()
       .from(auditEvent)
       .where(eq(auditEvent.tenantId, tenantId))
-      .orderBy(auditEvent.createdAt, "desc")
+      .orderBy(desc(auditEvent.createdAt))
       .limit(limit)
       .offset(offset);
 
@@ -119,7 +160,7 @@ export class AuditService {
       .select()
       .from(auditEvent)
       .where(eq(auditEvent.actorUserId, actorUserId))
-      .orderBy(auditEvent.createdAt, "desc")
+      .orderBy(desc(auditEvent.createdAt))
       .limit(limit)
       .offset(offset);
 
@@ -136,7 +177,7 @@ export class AuditService {
       .select()
       .from(auditEvent)
       .where(eq(auditEvent.traceId, traceId))
-      .orderBy(auditEvent.createdAt, "asc");
+      .orderBy(auditEvent.createdAt);
 
     return events;
   }
@@ -163,5 +204,3 @@ export function createAuditContext(request: {
     traceId: request.headers["x-trace-id"] || request.headers["x-request-id"] || randomUUID(),
   };
 }
-
-import { eq } from "drizzle-orm";

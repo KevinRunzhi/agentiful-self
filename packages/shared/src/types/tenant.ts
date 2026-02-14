@@ -4,6 +4,57 @@
  * Type definitions for tenant entities used across frontend and backend
  */
 
+export type SecurityAction = "log" | "alert" | "block";
+export type PIIMaskStrategy = "mask" | "hash" | "remove";
+
+export interface TenantAuthMethodsConfig {
+  password?: boolean;
+  phone?: boolean;
+  google?: boolean;
+  github?: boolean;
+  wechat?: boolean;
+  sso?: boolean;
+}
+
+export interface TenantSSOConfig {
+  provider?: "oidc" | "saml" | "cas";
+  issuerUrl?: string;
+  clientId?: string;
+  metadataUrl?: string;
+  enabled?: boolean;
+}
+
+export interface TenantPIIPolicyConfig {
+  enabled?: boolean;
+  strategy?: PIIMaskStrategy;
+  fields?: Array<"phone" | "email" | "id_card" | "bank_card" | "credit_card">;
+}
+
+export interface TenantOutputCompliancePolicyConfig {
+  enabled?: boolean;
+  action?: SecurityAction;
+  categories?: Array<"violence" | "hate" | "adult" | "political_cn" | "self_harm">;
+  customKeywords?: string[];
+}
+
+export interface TenantPromptInjectionPolicyConfig {
+  enabled?: boolean;
+  action?: SecurityAction;
+  customKeywords?: string[];
+}
+
+export interface TenantSecurityPolicyConfig {
+  authMethods?: TenantAuthMethodsConfig;
+  mfaPolicy?: "required" | "optional" | "disabled";
+  sso?: TenantSSOConfig;
+  promptInjection?: TenantPromptInjectionPolicyConfig;
+  pii?: TenantPIIPolicyConfig;
+  outputCompliance?: TenantOutputCompliancePolicyConfig;
+  audit?: {
+    retentionDays?: number;
+  };
+}
+
 /**
  * Tenant profile
  */
@@ -64,6 +115,8 @@ export interface TenantConfig {
   defaultLanguage?: string;
   // Theme preference
   defaultTheme?: "light" | "dark" | "system";
+  // Security and compliance policy (S3-2)
+  security?: TenantSecurityPolicyConfig;
 }
 
 /**

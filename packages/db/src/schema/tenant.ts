@@ -7,6 +7,9 @@
 
 import { pgTable, uuid, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 
+type SecurityAction = "log" | "alert" | "block";
+type PIIMaskStrategy = "mask" | "hash" | "remove";
+
 /**
  * Tenant configuration type
  */
@@ -45,8 +48,39 @@ export type TenantConfig = {
   defaultTheme?: "light" | "dark" | "system"; // Default 'system'
   // Security settings
   security?: {
+    authMethods?: {
+      password?: boolean;
+      phone?: boolean;
+      google?: boolean;
+      github?: boolean;
+      wechat?: boolean;
+      sso?: boolean;
+    };
+    sso?: {
+      provider?: "oidc" | "saml" | "cas";
+      issuerUrl?: string;
+      clientId?: string;
+      metadataUrl?: string;
+      enabled?: boolean;
+    };
     promptInjection?: {
-      action?: "log" | "alert" | "block";
+      enabled?: boolean;
+      action?: SecurityAction;
+      customKeywords?: string[];
+    };
+    pii?: {
+      enabled?: boolean;
+      strategy?: PIIMaskStrategy;
+      fields?: Array<"phone" | "email" | "id_card" | "bank_card" | "credit_card">;
+    };
+    outputCompliance?: {
+      enabled?: boolean;
+      action?: SecurityAction;
+      categories?: Array<"violence" | "hate" | "adult" | "political_cn" | "self_harm">;
+      customKeywords?: string[];
+    };
+    audit?: {
+      retentionDays?: number;
     };
   };
 };

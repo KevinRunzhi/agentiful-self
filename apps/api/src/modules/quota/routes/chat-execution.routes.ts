@@ -10,12 +10,19 @@
  */
 
 import { getDatabase } from "@agentifui/db/client";
+import { complianceEvent } from "@agentifui/db/schema";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import {
   markQuotaServiceDegraded,
   markQuotaServiceHealthy,
 } from "../../../middleware/quota-guard.js";
 import { auditService } from "../../auth/services/audit.service.js";
+import {
+  outputComplianceChecker,
+  piiDetector,
+  createSecurityPolicyConfigService,
+  DEFAULT_SECURITY_POLICY,
+} from "../../compliance/services/index.js";
 import { createNotificationService } from "../../notifications/services/notification.service";
 import { createQuotaRepository } from "../repositories/quota.repository";
 import { createQuotaAlertService } from "../services/quota-alert.service";
@@ -403,6 +410,7 @@ async function chatCompletions(
   const model = requestedModel ?? appId;
   const promptText = extractPromptText(body);
   const citations = normalizeCitationList(body.citations);
+  let complianceSummary: Record<string, unknown> | null = null;
   let executionService: ReturnType<typeof createExecutionPersistenceService> | null = null;
   let startedExecution: { runId: string; conversationId: string; runType: string } | null = null;
 
@@ -511,6 +519,122 @@ async function chatCompletions(
       ? `Processed request: ${promptText.slice(0, 200)}`
       : "Execution completed successfully.";
 
+    const securityPolicyService = createSecurityPolicyConfigService(db as any);
+    let securityPolicy = DEFAULT_SECURITY_POLICY;
+    try {
+      securityPolicy = await securityPolicyService.getPolicy(tenantId);
+    } catch {
+      // Policy lookup failures should not block request execution.
+    }
+
+    const outputCompliance = outputComplianceChecker.enforce({
+      text: assistantContent,
+      policy: securityPolicy.outputCompliance,
+    });
+    let finalAssistantContent = outputCompliance.content;
+
+    try {
+      if (outputCompliance.result.flagged) {
+        const eventAction =
+          outputCompliance.result.action === "block" ? "gov.content.blocked" : "gov.content.flagged";
+        await auditService.logSuccess({
+          tenantId,
+          actorUserId: userId,
+          actorType: "user",
+          action: eventAction,
+          eventCategory: "security_event",
+          eventType: eventAction,
+          resourceType: "run",
+          resourceId: runId,
+          traceId,
+          severity: outputCompliance.result.action === "block" ? "critical" : "high",
+          metadata: {
+            categories: outputCompliance.result.hits.map((item) => item.category),
+            action: outputCompliance.result.action,
+            keywordHits: outputCompliance.result.hits,
+          },
+        });
+
+        await (db as any).insert(complianceEvent).values({
+          tenantId,
+          userId,
+          runId,
+          conversationId: startedExecution.conversationId,
+          category: outputCompliance.result.hits.map((item) => item.category).join(","),
+          action: outputCompliance.result.action,
+          originalContent: assistantContent,
+          displayedContent: finalAssistantContent,
+          traceId,
+          metadata: {
+            hits: outputCompliance.result.hits,
+            policy: securityPolicy.outputCompliance ?? {},
+          },
+        });
+
+        if (outputCompliance.result.action === "alert" || outputCompliance.result.action === "block") {
+          const notificationService = createNotificationService(db as any);
+          const tenantAdminIds = await quotaRepository.listTenantAdminUserIds(tenantId);
+          for (const adminId of tenantAdminIds) {
+            await notificationService.create({
+              tenantId,
+              recipientId: adminId,
+              type: "system",
+              title: "Output compliance event",
+              content: outputCompliance.result.action === "block"
+                ? "A response was blocked by compliance policy."
+                : "A response triggered compliance policy alert.",
+              createdAt: new Date(),
+              traceId,
+              metadata: {
+                runId,
+                conversationId: startedExecution.conversationId,
+                action: outputCompliance.result.action,
+                categories: outputCompliance.result.hits.map((item) => item.category),
+              },
+            });
+          }
+        }
+      }
+    } catch {
+      // Compliance logging/notification failures should not block request execution.
+    }
+
+    try {
+      if (securityPolicy.pii?.enabled) {
+        const piiDetection = piiDetector.detect({
+          text: assistantContent,
+          enabledTypes: securityPolicy.pii.fields,
+        });
+        if (piiDetection.detections.length > 0) {
+          await auditService.logSuccess({
+            tenantId,
+            actorUserId: userId,
+            actorType: "user",
+            action: "gov.pii.detected",
+            eventCategory: "security_event",
+            eventType: "gov.pii.detected",
+            resourceType: "run",
+            resourceId: runId,
+            traceId,
+            severity: "high",
+            metadata: {
+              detectionCount: piiDetection.detections.length,
+              hitRate: piiDetection.hitRate,
+              types: [...new Set(piiDetection.detections.map((item) => item.type))],
+            },
+          });
+        }
+      }
+    } catch {
+      // PII detection failures should not block request execution.
+    }
+
+    complianceSummary = {
+      flagged: outputCompliance.result.flagged,
+      action: outputCompliance.result.action,
+      categories: outputCompliance.result.hits.map((item) => item.category),
+    };
+
     await executionService.completeExecution({
       runId,
       tenantId,
@@ -519,7 +643,7 @@ async function chatCompletions(
       conversationId: startedExecution.conversationId,
       traceId,
       model,
-      content: assistantContent,
+      content: finalAssistantContent,
       inputTokens: promptTokens,
       outputTokens: completionTokens,
       citations,
@@ -667,7 +791,7 @@ async function chatCompletions(
           index: 0,
           message: {
             role: "assistant",
-            content: assistantContent,
+            content: finalAssistantContent,
           },
           finish_reason: "stop",
         },
@@ -691,6 +815,7 @@ async function chatCompletions(
       conversation: {
         id: startedExecution.conversationId,
       },
+      compliance: complianceSummary,
       quota: {
         meteringMode,
         attribution: {
