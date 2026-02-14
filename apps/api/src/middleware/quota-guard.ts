@@ -145,10 +145,11 @@ export async function quotaGuardMiddleware(
     return reply.status(503).send({
       error: {
         type: "service_unavailable",
-        code: "quota_guard_degraded_deny_new",
+        code: "service_degraded",
         message: state.reason || "Quota service degraded, new requests are temporarily denied",
-        trace_id: request.id,
       },
+      traceId: request.id,
+      degraded: true,
     });
   }
 }

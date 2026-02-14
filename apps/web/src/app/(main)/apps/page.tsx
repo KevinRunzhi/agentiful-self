@@ -13,6 +13,7 @@ import {
 } from "../../../features/apps/hooks";
 
 const DEGRADED_CODES = new Set([
+  "service_degraded",
   "quota_guard_degraded_deny_new",
   "quota_service_unavailable",
 ]);

@@ -5,11 +5,12 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["apps/api/tests/**/*.test.ts"],
+    include: ["apps/**/tests/**/*.test.ts", "packages/**/tests/**/*.test.ts"],
     exclude: [
       "**/node_modules/**",
       "**/dist/**",
       "**/.next/**",
+      "apps/web/e2e/**",
       "apps/api/tests/integration/grant.test.ts",
       "apps/api/tests/integration/permission.test.ts",
       "apps/api/tests/integration/visibility.test.ts",
