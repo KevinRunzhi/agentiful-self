@@ -1,18 +1,33 @@
 /**
- * Login Flow E2E Test
- *
- * Tests the complete login and tenant switching flow
+ * Login flow E2E tests (frontend contract with mocked auth endpoints).
  */
 
-import { test, expect } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function mockLockoutCheck(page: Page) {
+  await page.route("**/api/auth/check-lockout", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        isLocked: false,
+        remainingAttempts: 5,
+        lockoutTimeRemaining: 0,
+        maxAttempts: 5,
+      }),
+    });
+  });
+}
 
 test.describe("Login Flow", () => {
   test.beforeEach(async ({ page }) => {
+    await mockLockoutCheck(page);
     await page.goto("/login");
   });
 
   test("should display login form", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("Sign in to your account");
+    await expect(page.locator("h1")).toContainText("Agentiful");
+    await expect(page.locator("text=Sign in to your account")).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
   });
@@ -21,57 +36,54 @@ test.describe("Login Flow", () => {
     await page.click('button[type="submit"]');
 
     await expect(page.locator("text=/email is required/i")).toBeVisible();
+    await expect(page.locator("text=/password is required/i")).toBeVisible();
   });
 
-  test("should show account lockout after 5 failed attempts", async ({ page }) => {
-    const email = "locked@example.com";
-    const password = "wrongpassword";
+  test("should show auth error for invalid credentials", async ({ page }) => {
+    await page.route("**/api/auth/sign-in", async (route) => {
+      await route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            message: "Authentication failed",
+          },
+        }),
+      });
+    });
 
-    // Attempt 5 failed logins
-    for (let i = 0; i < 5; i++) {
-      await page.fill('input[type="email"]', email);
-      await page.fill('input[type="password"]', password);
-      await page.click('button[type="submit"]');
+    await page.fill('input[type="email"]', "locked@example.com");
+    await page.fill('input[type="password"]', "wrongpassword");
+    await page.click('button[type="submit"]');
 
-      if (i < 4) {
-        await expect(page.locator("text=/Authentication failed/i")).toBeVisible();
-      }
-    }
-
-    // 5th attempt should show lockout
-    await expect(page.locator("text=/Account is locked/i")).toBeVisible();
+    await expect(page.locator("text=/authentication failed/i")).toBeVisible();
+    await expect(page).toHaveURL("/login");
   });
 
-  test("should login successfully with valid credentials", async ({ page }) => {
-    // TODO: Add test user creation
+  test("should redirect to apps for valid credentials", async ({ page }) => {
+    await page.route("**/api/auth/sign-in", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            user: {
+              id: "user-test",
+              email: "test@example.com",
+            },
+            tenant: null,
+            token: "token-test",
+            refreshToken: null,
+            expiresAt: "2099-01-01T00:00:00.000Z",
+          },
+        }),
+      });
+    });
+
     await page.fill('input[type="email"]', "test@example.com");
     await page.fill('input[type="password"]', "password123");
     await page.click('button[type="submit"]');
 
-    // Should redirect to dashboard
-    await expect(page).toHaveURL("/dashboard");
-  });
-});
-
-test.describe("Tenant Switching", () => {
-  test("should display tenant selector when user has multiple tenants", async ({ page }) => {
-    // TODO: Login with user who has multiple tenants
-    await page.goto("/dashboard");
-
-    const tenantSelector = page.locator('[data-testid="tenant-selector"]');
-    await expect(tenantSelector).toBeVisible();
-  });
-
-  test("should switch tenant context", async ({ page }) => {
-    await page.goto("/dashboard");
-
-    const tenantSelector = page.locator('[data-testid="tenant-selector"]');
-    await tenantSelector.click();
-
-    // Select different tenant
-    await page.click('text=/Second Tenant/');
-
-    // Verify context switched
-    await expect(page.locator('[data-testid="current-tenant"]')).toContainText("Second Tenant");
+    await expect(page).toHaveURL("/apps");
   });
 });

@@ -1,6 +1,11 @@
 import { useCallback, useState } from "react";
 import { markRecentUse as markRecentUseApi } from "../api";
 
+const DEGRADE_ERROR_CODES = new Set([
+  "quota_guard_degraded_deny_new",
+  "quota_service_unavailable",
+]);
+
 export interface UseAppRecentResult {
   markRecentUse: (
     appId: string,
@@ -37,7 +42,10 @@ export function useAppRecent(): UseAppRecentResult {
           return { ok: true };
         }
 
-        setError(result.errorMessage ?? "Failed to start conversation");
+        if (!result.errorCode || !DEGRADE_ERROR_CODES.has(result.errorCode)) {
+          setError(result.errorMessage ?? "Failed to start conversation");
+        }
+
         if (result.errorCode) {
           return { ok: false, errorCode: result.errorCode };
         }

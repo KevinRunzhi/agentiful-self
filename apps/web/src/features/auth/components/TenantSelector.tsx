@@ -10,7 +10,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 import { Button } from "@agentifui/ui/Button";
 import { Card, CardContent } from "@agentifui/ui/Card";
-import { useAuthStore } from "../../features/auth/stores/authStore";
+import { useAuthStore } from "../stores/authStore";
 
 /**
  * Tenant membership

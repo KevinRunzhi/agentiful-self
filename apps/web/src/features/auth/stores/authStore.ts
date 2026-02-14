@@ -116,19 +116,44 @@ export const useAuthStore = create<AuthState>()(
             body: JSON.stringify({ email, password, tenantSlug }),
           });
 
-          const data = await response.json();
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            const message =
+              data?.error?.message ||
+              data?.message ||
+              `Sign in failed (${response.status})`;
+            set({ error: message, isLoading: false });
+            throw new Error(message);
+          }
 
           if (data.error) {
-            set({ error: data.error.message, isLoading: false });
-            return;
+            const message = data.error.message || "Authentication failed";
+            set({ error: message, isLoading: false });
+            throw new Error(message);
+          }
+
+          if (!data.session) {
+            const message = "Sign in failed";
+            set({ error: message, isLoading: false });
+            throw new Error(message);
           }
 
           set({ session: data.session, isLoading: false });
         } catch (error) {
+          if (error instanceof Error) {
+            if (get().error === error.message) {
+              throw error;
+            }
+            set({ error: error.message, isLoading: false });
+            throw error;
+          }
+
           set({
-            error: error instanceof Error ? error.message : "Sign in failed",
+            error: "Sign in failed",
             isLoading: false,
           });
+          throw new Error("Sign in failed");
         }
       },
 

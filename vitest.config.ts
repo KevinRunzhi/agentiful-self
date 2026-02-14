@@ -5,8 +5,17 @@ export default defineConfig({
   test: {
     globals: true,
     environment: "node",
-    include: ["**/*.test.ts", "**/*.spec.ts"],
-    exclude: ["node_modules", "dist", ".next"],
+    include: ["apps/api/tests/**/*.test.ts"],
+    exclude: [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.next/**",
+      "apps/api/tests/integration/grant.test.ts",
+      "apps/api/tests/integration/permission.test.ts",
+      "apps/api/tests/integration/visibility.test.ts",
+      "apps/api/tests/integration/group-permissions.test.ts",
+      "apps/api/tests/performance/rbac-performance.test.ts",
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],

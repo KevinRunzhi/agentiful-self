@@ -5,6 +5,12 @@
  * for unit and integration tests across the monorepo.
  */
 
+interface VitestTimerApi {
+  useFakeTimers: () => void;
+  setSystemTime: (date: Date) => void;
+  useRealTimers: () => void;
+}
+
 /**
  * Generates a random email for testing
  */
@@ -43,7 +49,7 @@ export function generateTestPassword(): string {
  */
 export function createMockTenant(overrides?: Partial<Tenant>): Tenant {
   return {
-    id: generateTestString("tenant"),
+    id: `tenant_${generateTestString(12)}`,
     name: `Test Tenant ${generateTestString(8)}`,
     status: "active",
     createdAt: new Date(),
@@ -57,7 +63,7 @@ export function createMockTenant(overrides?: Partial<Tenant>): Tenant {
  */
 export function createMockUser(overrides?: Partial<User>): User {
   return {
-    id: generateTestString("user"),
+    id: `user_${generateTestString(12)}`,
     email: generateTestEmail(),
     name: "Test User",
     status: "active",
@@ -73,8 +79,8 @@ export function createMockUser(overrides?: Partial<User>): User {
  * Creates a mock user role for testing
  */
 export function createMockUserRole(overrides?: Partial<UserRole>): UserRole {
-  const tenantId = generateTestString("tenant");
-  const userId = generateTestString("user");
+  const tenantId = `tenant_${generateTestString(12)}`;
+  const userId = `user_${generateTestString(12)}`;
   return {
     userId,
     tenantId,
@@ -139,11 +145,20 @@ export interface UserRole {
  */
 export const mockDate = new Date("2025-01-01T00:00:00.000Z");
 
+function getVitestTimerApi(): VitestTimerApi {
+  const timerApi = (globalThis as { vi?: VitestTimerApi }).vi;
+  if (!timerApi) {
+    throw new Error("Vitest timer API is unavailable in current runtime");
+  }
+  return timerApi;
+}
+
 export function setMockDate(date: Date): void {
-  vi.useFakeTimers();
-  vi.setSystemTime(date);
+  const timerApi = getVitestTimerApi();
+  timerApi.useFakeTimers();
+  timerApi.setSystemTime(date);
 }
 
 export function resetMockDate(): void {
-  vi.useRealTimers();
+  getVitestTimerApi().useRealTimers();
 }

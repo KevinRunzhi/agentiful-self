@@ -5,6 +5,11 @@
     "rootDir": ".",
     "outDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@agentifui/ui/*": ["src/components/ui/*"],
+      "@agentifui/ui/utils": ["../../packages/ui/src/utils/cn.ts"]
+    },
     "jsx": "preserve",
     "plugins": [
       {

@@ -13,7 +13,7 @@ import { Button } from "@agentifui/ui/Button";
 import { Input } from "@agentifui/ui/Input";
 import { Label } from "@agentifui/ui/Label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@agentifui/ui/Card";
-import { useAuthStore } from "../../features/auth/stores/authStore";
+import { useAuthStore } from "../stores/authStore";
 
 /**
  * Login form state
@@ -79,6 +79,16 @@ export function LoginForm({ initialTenantSlug, redirectTo = "/dashboard" }: Logi
 
   // Password visibility
   const [showPassword, setShowPassword] = React.useState(false);
+  const lockoutCheckTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  React.useEffect(
+    () => () => {
+      if (lockoutCheckTimerRef.current) {
+        clearTimeout(lockoutCheckTimerRef.current);
+      }
+    },
+    []
+  );
 
   /**
    * Validate form
@@ -136,11 +146,13 @@ export function LoginForm({ initialTenantSlug, redirectTo = "/dashboard" }: Logi
     setErrors((prev) => ({ ...prev, email: undefined, general: undefined }));
 
     // Debounced lockout check
-    const timeoutId = setTimeout(() => {
-      checkLockoutStatus(value);
-    }, 500);
+    if (lockoutCheckTimerRef.current) {
+      clearTimeout(lockoutCheckTimerRef.current);
+    }
 
-    return () => clearTimeout(timeoutId);
+    lockoutCheckTimerRef.current = setTimeout(() => {
+      void checkLockoutStatus(value);
+    }, 500);
   };
 
   /**
@@ -199,7 +211,7 @@ export function LoginForm({ initialTenantSlug, redirectTo = "/dashboard" }: Logi
         <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
 
-      <form onSubmit={handleSubmit}>
+      <form noValidate onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           {/* General error */}
           {errors.general && (
@@ -236,6 +248,11 @@ export function LoginForm({ initialTenantSlug, redirectTo = "/dashboard" }: Logi
               autoComplete="email"
               required
             />
+            {errors.email ? (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.email}
+              </p>
+            ) : null}
           </div>
 
           {/* Password field */}
@@ -261,6 +278,11 @@ export function LoginForm({ initialTenantSlug, redirectTo = "/dashboard" }: Logi
               autoComplete="current-password"
               required
             />
+            {errors.password ? (
+              <p className="text-sm text-destructive" role="alert">
+                {errors.password}
+              </p>
+            ) : null}
           </div>
 
           {/* Forgot password link */}
