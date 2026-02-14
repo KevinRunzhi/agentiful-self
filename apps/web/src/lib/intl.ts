@@ -3,17 +3,17 @@
  */
 
 import { getRequestConfig } from "next-intl/server";
+import { normalizeLocale } from "./language";
 
 export const locales = ["en", "zh"] as const;
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = "en";
+export const defaultLocale: Locale = "zh";
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requestedLocale = (await requestLocale) ?? defaultLocale;
-  const resolvedLocale = locales.includes(requestedLocale as Locale)
-    ? (requestedLocale as Locale)
-    : defaultLocale;
+  const normalized = normalizeLocale(requestedLocale);
+  const resolvedLocale: Locale = normalized ?? defaultLocale;
 
   return {
     locale: resolvedLocale,
@@ -25,7 +25,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
 
 export const languageNames: Record<Locale, string> = {
   en: "English",
-  zh: "Chinese",
+  zh: "中文",
 };
 
 export function getLocaleFromPathname(pathname: string): Locale {

@@ -4,6 +4,7 @@
  * User authentication page
  */
 
+import { getTranslations } from "next-intl/server";
 import { LoginForm } from "../../../features/auth/components";
 
 interface LoginPageSearchParams {
@@ -26,6 +27,7 @@ function getParamValue(value: string | string[] | undefined): string | undefined
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const t = await getTranslations("auth.login");
   const params = (await searchParams) ?? {};
   const tenant = getParamValue(params.tenant);
   const redirect = getParamValue(params.redirect);
@@ -38,20 +40,20 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         {/* Logo/brand header */}
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold">Agentiful</h1>
-          <p className="text-muted-foreground">Sign in to your account</p>
+          <p className="text-muted-foreground">{t("description")}</p>
         </div>
 
         {/* Success message from password reset */}
         {reset === "true" && (
           <div className="p-4 rounded-md bg-green-500/10 text-green-700 dark:text-green-400 text-sm">
-            Your password has been reset. Please sign in with your new password.
+            {t("messages.passwordReset")}
           </div>
         )}
 
         {/* Success message from invitation acceptance */}
         {accepted === "true" && (
           <div className="p-4 rounded-md bg-green-500/10 text-green-700 dark:text-green-400 text-sm">
-            Your account has been created. Please sign in with your credentials.
+            {t("messages.invitationAccepted")}
           </div>
         )}
 

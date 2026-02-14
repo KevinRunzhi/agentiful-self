@@ -66,6 +66,11 @@ export async function createApp(): Promise<AppInstance> {
     return { status: "ok", timestamp: new Date().toISOString() };
   });
 
+  // Kubernetes-style liveness endpoint (S3-3 reliability target)
+  app.get("/healthz", async () => {
+    return { status: "ok", timestamp: new Date().toISOString() };
+  });
+
   // Readiness check
   app.get("/ready", async (request, reply) => {
     // TODO: Add database and redis checks

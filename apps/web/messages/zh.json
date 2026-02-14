@@ -1,47 +1,51 @@
 {
   "auth": {
     "login": {
-      "title": "Sign in",
-      "description": "Use your email and password to continue",
-      "noAccount": "Don't have an account?",
+      "title": "登录",
+      "description": "使用邮箱和密码继续",
+      "noAccount": "还没有账号？",
       "fields": {
         "email": {
-          "label": "Email",
+          "label": "邮箱",
           "placeholder": "you@example.com"
         },
         "password": {
-          "label": "Password",
-          "placeholder": "Enter your password"
+          "label": "密码",
+          "placeholder": "请输入密码"
         }
       },
       "actions": {
-        "hidePassword": "Hide",
-        "showPassword": "Show",
-        "forgotPassword": "Forgot password?",
-        "signingIn": "Signing in...",
-        "signIn": "Sign in",
-        "signUp": "Sign up"
+        "hidePassword": "隐藏",
+        "showPassword": "显示",
+        "forgotPassword": "忘记密码？",
+        "signingIn": "登录中...",
+        "signIn": "登录",
+        "signUp": "注册"
       },
       "errors": {
-        "emailRequired": "Email is required",
-        "emailInvalid": "Please enter a valid email address",
-        "passwordRequired": "Password is required",
-        "accountLocked": "Account is locked",
-        "lockoutTimeRemaining": "Try again in {minutes} minutes",
-        "remainingAttempts": "{count} attempts remaining",
-        "loginFailed": "Authentication failed"
+        "emailRequired": "邮箱不能为空",
+        "emailInvalid": "请输入有效邮箱地址",
+        "passwordRequired": "密码不能为空",
+        "accountLocked": "账号已锁定",
+        "lockoutTimeRemaining": "{minutes} 分钟后再试",
+        "remainingAttempts": "剩余 {count} 次尝试机会",
+        "loginFailed": "登录失败"
+      },
+      "messages": {
+        "passwordReset": "密码已重置，请使用新密码登录。",
+        "invitationAccepted": "账号已创建成功，请使用凭据登录。"
       }
     },
     "tenant": {
-      "current": "Current",
-      "noTenants": "No tenants available",
+      "current": "当前",
+      "noTenants": "暂无可用租户",
       "errors": {
-        "switchFailed": "Failed to switch tenant"
+        "switchFailed": "切换租户失败"
       },
       "status": {
-        "active": "Active",
-        "pending": "Pending",
-        "suspended": "Suspended"
+        "active": "启用中",
+        "pending": "待处理",
+        "suspended": "已暂停"
       }
     }
   }

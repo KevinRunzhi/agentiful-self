@@ -30,6 +30,10 @@
         "lockoutTimeRemaining": "Try again in {minutes} minutes",
         "remainingAttempts": "{count} attempts remaining",
         "loginFailed": "Authentication failed"
+      },
+      "messages": {
+        "passwordReset": "Your password has been reset. Please sign in with your new password.",
+        "invitationAccepted": "Your account has been created. Please sign in with your credentials."
       }
     },
     "tenant": {

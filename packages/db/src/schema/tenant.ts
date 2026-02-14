@@ -5,18 +5,23 @@
  * Displayed as "Workspace" in the UI.
  */
 
-import { pgTable, uuid, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
+import { integer, jsonb, pgTable, timestamp, uuid, varchar, index } from "drizzle-orm/pg-core";
+
+export type TenantStatus = "active" | "suspended" | "deleted";
 
 /**
  * Tenant configuration type
+ *
+ * S3-3 clarifications align config into stable namespaces while preserving
+ * legacy auth/security fields.
  */
 export type TenantConfig = {
-  // Authentication configuration
+  // Authentication configuration (legacy)
   auth?: {
     emailPasswordEnabled: boolean;
     requireEmailVerification: boolean;
   };
-  // Password policy
+  // Password policy (legacy)
   passwordPolicy?: {
     minLength: number; // Default 8
     requireUppercase: boolean; // Default true
@@ -26,28 +31,66 @@ export type TenantConfig = {
     expireDays?: number; // 30-365, null means no expiration
     historyLimit: number; // 3-12, default 5
   };
-  // Account lockout policy
+  // Account lockout policy (legacy)
   accountLockout?: {
     enabled: boolean; // Default true
     maxAttempts: number; // Default 5
     lockoutDurationMinutes: number; // Default 30
   };
-  // MFA policy
+  // MFA policy (legacy)
   mfaPolicy?: "required" | "optional" | "disabled"; // Default 'optional'
-  // User approval
+  // User approval (legacy)
   userApproval?: {
     enabled: boolean; // Default false
     ssoBypassApproval: boolean; // Default true
   };
-  // Default language
-  defaultLanguage?: string; // Default 'en'
-  // Theme preference
-  defaultTheme?: "light" | "dark" | "system"; // Default 'system'
-  // Security settings
+  // Default language / theme (legacy)
+  defaultLanguage?: string;
+  defaultTheme?: "light" | "dark" | "system";
+  // Security settings (legacy)
   security?: {
     promptInjection?: {
       action?: "log" | "alert" | "block";
     };
+  };
+
+  // S3-3 settings namespaces
+  branding?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+    logo?: string;
+    favicon?: string;
+    siteName?: string;
+  };
+  i18n?: {
+    defaultLanguage?: "zh-CN" | "en-US" | "zh" | "en";
+    allowUserOverride?: boolean;
+  };
+  webhook?: {
+    url?: string;
+    subscribedEvents?: string[];
+    signingSecret?: string;
+    enabled?: boolean;
+  };
+  observability?: {
+    urlTemplate?: string;
+    platformType?: "grafana" | "jaeger" | "custom";
+    enabled?: boolean;
+  };
+  notification?: {
+    typesEnabled?: string[];
+    retentionDays?: number;
+    inAppNotifications?: boolean;
+  };
+  fileUpload?: {
+    maxSizeMb?: number;
+    allowedTypes?: string[];
+    retentionDays?: number;
+  };
+  conversationShare?: {
+    defaultTtlDays?: number;
+    maxTtlDays?: number;
+    requireLogin?: boolean;
   };
 };
 
@@ -64,9 +107,11 @@ export const tenant = pgTable(
     slug: varchar("slug", { length: 100 }).unique(),
     status: varchar("status", { length: 20 })
       .notNull()
-      .default("active"), // 'active' | 'suspended'
+      .default("active"), // active | suspended | deleted
     plan: varchar("plan", { length: 50 }).default("free"),
     customConfig: jsonb("custom_config").$type<TenantConfig>().default({}),
+    configVersion: integer("config_version").notNull().default(1),
+    deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow(),
     updatedAt: timestamp("updated_at").defaultNow(),
   },
