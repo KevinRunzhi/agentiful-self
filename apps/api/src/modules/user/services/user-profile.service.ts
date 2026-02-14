@@ -4,7 +4,7 @@
  * Business logic for user profile updates
  */
 
-import { userRepository } from "../auth/repositories/user.repository";
+import { userRepository } from "../../auth/repositories/user.repository.js";
 import type { User } from "@agentifui/db/schema";
 
 /**

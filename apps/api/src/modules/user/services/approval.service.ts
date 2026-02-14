@@ -5,9 +5,9 @@
  */
 
 import { userStatusService } from "./user-status.service";
-import { tenantRepository } from "../auth/repositories/tenant.repository";
-import { userRoleRepository } from "../auth/repositories/user-role.repository";
-import { auditService } from "../auth/services/audit.service";
+import { tenantRepository } from "../../auth/repositories/tenant.repository.js";
+import { userRoleRepository } from "../../auth/repositories/user-role.repository.js";
+import { auditService } from "../../auth/services/audit.service.js";
 
 /**
  * Approval queue item
@@ -53,12 +53,12 @@ export class ApprovalService {
 
         queue.push({
           userId: user.id,
-          userName: user.name,
+          userName: user.name ?? user.email,
           userEmail: user.email,
           tenantId,
           tenantName: tenant?.name || "",
           role: userRole.role,
-          createdAt: user.createdAt.toISOString(),
+          createdAt: (user.createdAt ?? new Date()).toISOString(),
         });
       }
     }
@@ -77,16 +77,21 @@ export class ApprovalService {
     const result = await userStatusService.approveUser(userId, tenantId);
 
     if (!result.success) {
-      return result;
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+      return { success: false };
     }
 
     // Log approval
     await auditService.logSuccess({
-      userId: approvedBy,
+      actorUserId: approvedBy,
+      actorType: "admin",
       tenantId,
       action: "user.approve",
-      targetUserId: userId,
-      details: { approvedAt: new Date().toISOString() },
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { approvedAt: new Date().toISOString() },
     });
 
     return { success: true };
@@ -104,16 +109,21 @@ export class ApprovalService {
     const result = await userStatusService.rejectUser(userId, tenantId);
 
     if (!result.success) {
-      return result;
+      if (result.error) {
+        return { success: false, error: result.error };
+      }
+      return { success: false };
     }
 
     // Log rejection
     await auditService.logSuccess({
-      userId: rejectedBy,
+      actorUserId: rejectedBy,
+      actorType: "admin",
       tenantId,
       action: "user.reject",
-      targetUserId: userId,
-      details: { rejectedAt: new Date().toISOString(), reason },
+      resourceType: "user",
+      resourceId: userId,
+      metadata: { rejectedAt: new Date().toISOString(), reason: reason ?? null },
     });
 
     return { success: true };

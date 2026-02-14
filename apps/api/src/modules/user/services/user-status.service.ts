@@ -4,23 +4,23 @@
  * Business logic for user status transitions (pending, active, suspended, etc.)
  */
 
-import { userRepository } from "../repositories/user.repository";
-import { userRoleRepository } from "../repositories/user-role.repository";
+import { userRepository } from "../../auth/repositories/user.repository.js";
+import { userRoleRepository } from "../../auth/repositories/user-role.repository.js";
 import type { User } from "@agentifui/db/schema";
 
 /**
  * User status values
  */
-export type UserStatus = "pending" | "active" | "suspended" | "inactive";
+export type UserStatus = "pending" | "active" | "suspended" | "rejected";
 
 /**
  * Status transition rules
  */
 const STATUS_TRANSITIONS: Record<UserStatus, UserStatus[]> = {
-  pending: ["active", "inactive"],
-  active: ["suspended", "inactive"],
-  suspended: ["active", "inactive"],
-  inactive: [], // Cannot reactivate from inactive
+  pending: ["active", "rejected", "suspended"],
+  active: ["suspended", "rejected"],
+  suspended: ["active", "rejected"],
+  rejected: ["active"],
 };
 
 /**
@@ -99,7 +99,7 @@ export class UserStatusService {
     userId: string,
     tenantId: string
   ): Promise<ServiceResult<User>> {
-    return this.changeStatus(userId, "inactive", tenantId);
+    return this.changeStatus(userId, "rejected", tenantId);
   }
 
   /**
@@ -185,10 +185,10 @@ export class UserStatusService {
         color: "orange",
         description: "Account is temporarily suspended",
       },
-      inactive: {
-        label: "Inactive",
+      rejected: {
+        label: "Rejected",
         color: "gray",
-        description: "Account has been deactivated",
+        description: "Account request has been rejected by an administrator",
       },
     };
 

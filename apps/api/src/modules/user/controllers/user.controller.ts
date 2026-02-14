@@ -5,9 +5,10 @@
  */
 
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { userRepository } from "../auth/repositories/user.repository";
-import { userStatusService } from "../user/services/user-status.service";
-import { approvalService } from "../user/services/approval.service";
+import { userRepository } from "../../auth/repositories/user.repository.js";
+import { userStatusService } from "../services/user-status.service.js";
+import type { UserStatus } from "../services/user-status.service.js";
+import { approvalService } from "../services/approval.service.js";
 
 /**
  * Get authenticated user
@@ -149,10 +150,16 @@ export async function updateUserStatusHandler(
 
   const { targetUserId } = request.params as { targetUserId: string };
   const { status } = request.body as { status: string };
+  const allowedStatuses: UserStatus[] = ["pending", "active", "suspended", "rejected"];
+  if (!allowedStatuses.includes(status as UserStatus)) {
+    return reply.status(400).send({
+      error: { message: "Invalid status", code: "INVALID_STATUS" },
+    });
+  }
 
   const result = await userStatusService.changeStatus(
     targetUserId,
-    status,
+    status as UserStatus,
     tenantId
   );
 
@@ -214,8 +221,12 @@ export async function updateUserProfileHandler(
   }
 
   const { name } = request.body as { name?: string };
+  const updateData: { name?: string | null } = {};
+  if (typeof name === "string") {
+    updateData.name = name.trim() ? name.trim() : null;
+  }
 
-  const updated = await userRepository.update(userId, { name });
+  const updated = await userRepository.update(userId, updateData);
 
   if (!updated) {
     return reply.status(500).send({
