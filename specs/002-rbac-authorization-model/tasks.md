@@ -311,8 +311,8 @@
 
 #### Frontend - Components
 
-- [ ] T115 [P] [US6] Create BreakglassActivateForm component in apps/web/src/features/rbac/components/breakglass-form.tsx
-- [ ] T116 [P] [US6] Create NotificationBadge component in apps/web/src/shared/components/notification-badge.tsx
+- [X] T115 [P] [US6] Create BreakglassActivateForm component in apps/web/src/features/rbac/components/breakglass-form.tsx
+- [X] T116 [P] [US6] Create NotificationBadge component in apps/web/src/shared/components/notification-badge.tsx
 
 #### Auditing
 
@@ -442,14 +442,13 @@
 | Phase 5: US3 | ✅ COMPLETE | 13 | 13 | 0 |
 | Phase 6: US4 | ✅ COMPLETE | 8 | 6 | 2* |
 | Phase 7: US5 | ✅ COMPLETE | 9 | 9 | 0 |
-| Phase 8: US6 | ✅ COMPLETE | 16 | 14 | 2** |
+| Phase 8: US6 | ✅ COMPLETE | 16 | 16 | 0 |
 | Phase 9: US7 | ✅ COMPLETE | 7 | 7 | 0 |
 | Phase 10: Polish | ✅ COMPLETE | 17 | 17 | 0 |
 
 * T090-T091 require conversation/analytics modules (deferred to S1-3/S3)
-** T115-T116 are frontend components (can be added later)
 
-**Total**: 145 tasks - 142 complete (98%), 3 pending (2%)
+**Total**: 145 tasks - 144 complete (99%), 1 pending (1%)
 
 ### Incremental Delivery
 
