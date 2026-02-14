@@ -65,6 +65,8 @@ export interface TenantProfile {
   status: TenantStatus;
   plan: TenantPlan;
   customConfig: TenantConfig;
+  configVersion: number;
+  deletedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -72,7 +74,7 @@ export interface TenantProfile {
 /**
  * Tenant status
  */
-export type TenantStatus = "active" | "suspended";
+export type TenantStatus = "active" | "suspended" | "deleted";
 
 /**
  * Tenant plan
@@ -117,6 +119,45 @@ export interface TenantConfig {
   defaultTheme?: "light" | "dark" | "system";
   // Security and compliance policy (S3-2)
   security?: TenantSecurityPolicyConfig;
+
+  // S3-3 settings namespaces
+  branding?: {
+    primaryColor?: string;
+    secondaryColor?: string;
+    logo?: string;
+    favicon?: string;
+    siteName?: string;
+  };
+  i18n?: {
+    defaultLanguage?: "zh-CN" | "en-US" | "zh" | "en";
+    allowUserOverride?: boolean;
+  };
+  webhook?: {
+    url?: string;
+    subscribedEvents?: string[];
+    signingSecret?: string;
+    enabled?: boolean;
+  };
+  observability?: {
+    urlTemplate?: string;
+    platformType?: "grafana" | "jaeger" | "custom";
+    enabled?: boolean;
+  };
+  notification?: {
+    typesEnabled?: string[];
+    retentionDays?: number;
+    inAppNotifications?: boolean;
+  };
+  fileUpload?: {
+    maxSizeMb?: number;
+    allowedTypes?: string[];
+    retentionDays?: number;
+  };
+  conversationShare?: {
+    defaultTtlDays?: number;
+    maxTtlDays?: number;
+    requireLogin?: boolean;
+  };
 }
 
 /**

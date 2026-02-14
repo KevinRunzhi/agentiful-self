@@ -27,7 +27,9 @@ test.describe("Login Flow", () => {
 
   test("should display login form", async ({ page }) => {
     await expect(page.locator("h1")).toContainText("Agentiful");
-    await expect(page.locator("text=Sign in to your account")).toBeVisible();
+    await expect(
+      page.getByText(/Sign in to your account|使用邮箱和密码继续/i)
+    ).toBeVisible();
     await expect(page.locator('input[type="email"]')).toBeVisible();
     await expect(page.locator('input[type="password"]')).toBeVisible();
   });
@@ -35,8 +37,8 @@ test.describe("Login Flow", () => {
   test("should show validation errors for empty form", async ({ page }) => {
     await page.click('button[type="submit"]');
 
-    await expect(page.locator("text=/email is required/i")).toBeVisible();
-    await expect(page.locator("text=/password is required/i")).toBeVisible();
+    await expect(page.getByText(/email is required|邮箱不能为空/i)).toBeVisible();
+    await expect(page.getByText(/password is required|密码不能为空/i)).toBeVisible();
   });
 
   test("should show auth error for invalid credentials", async ({ page }) => {
