@@ -26,6 +26,7 @@ import { registerQuotaRoutes } from "./modules/quota/routes/index.js";
 import { registerChatExecutionRoutes } from "./modules/quota/routes/chat-execution.routes.js";
 import { createQuotaRepository } from "./modules/quota/repositories/quota.repository.js";
 import { registerGatewayRoutes } from "./modules/gateway/routes.js";
+import { registerConversationRoutes } from "./modules/conversation/routes/index.js";
 
 /**
  * Bootstrap and start the application
@@ -93,6 +94,9 @@ async function main() {
 
   // Gateway health and observability endpoints
   await app.register(registerGatewayRoutes, { prefix: "/api/v1" });
+
+  // S2-2 conversation routes
+  await app.register(registerConversationRoutes, { prefix: "/api/v1" });
 
   // Notification retention cleanup (90 days)
   try {

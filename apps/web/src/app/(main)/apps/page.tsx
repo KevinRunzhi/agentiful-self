@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AppWorkbenchCard,
   AppsSearchFilters,
@@ -19,6 +20,7 @@ const DEGRADED_CODES = new Set([
 ]);
 
 export default function AppsPage() {
+  const router = useRouter();
   const [degraded, setDegraded] = useState(false);
   const {
     view,
@@ -62,11 +64,16 @@ export default function AppsPage() {
         patchApp(appId, { lastUsedAt: new Date().toISOString() });
       });
 
+      if (result.ok) {
+        router.push(`/apps/${appId}/chat`);
+        return;
+      }
+
       if (!result.ok && result.errorCode && DEGRADED_CODES.has(result.errorCode)) {
         setDegraded(true);
       }
     },
-    [degraded, markRecentUse, patchApp]
+    [degraded, markRecentUse, patchApp, router]
   );
 
   const error = useMemo(

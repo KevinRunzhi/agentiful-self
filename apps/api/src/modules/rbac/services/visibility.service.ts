@@ -378,7 +378,7 @@ export class VisibilityService implements IVisibilityService {
       const result = await this.db
         .select({
           userId: conversation.userId,
-          groupId: conversation.groupId,
+          groupId: conversation.activeGroupId,
         })
         .from(conversation)
         .where(eq(conversation.id, conversationId))
