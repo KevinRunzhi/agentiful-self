@@ -19,6 +19,9 @@ const SAFE_READ_PATHS = [
 
 const EXECUTION_PATHS = [
   /^\/v1\/chat\/completions$/,
+  /^\/api\/v1\/conversations\/[^/]+\/messages$/,
+  /^\/api\/v1\/conversations\/[^/]+\/messages\/[^/]+\/edit-resend$/,
+  /^\/api\/v1\/conversations\/[^/]+\/messages\/[^/]+\/regenerate$/,
 ];
 
 export interface QuotaGuardState {
