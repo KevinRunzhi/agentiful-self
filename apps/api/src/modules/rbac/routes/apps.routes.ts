@@ -1,244 +1,361 @@
 /**
  * Apps Routes
  *
- * API routes for accessible apps and context options (T076-T077, T119-T120).
- *
- * Endpoints:
- * - GET /apps/accessible - Get apps accessible to user
- * - GET /apps/:id/context-options - Get context switching options for an app
+ * S1-3 workbench routes for accessible apps, context options, favorites, and recent usage.
  */
 
-import type { FastifyInstance, FastifyRequest, FastifyReply, FastifyJsonSchema } from 'fastify';
-import { createAppService } from '../services/app.service';
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import {
+  AppNotAccessibleError,
+  AppNotFoundError,
+  DuplicateFavoriteError,
+  FavoriteLimitExceededError,
+  createAppService,
+} from "../services/app.service";
 
-// =============================================================================
-// Route Handlers
-// =============================================================================
+interface AuthUser {
+  id: string;
+  tenantId?: string;
+}
 
-/**
- * T076 [P] [US3] Create GET /apps/accessible route
- */
+interface AccessibleAppsQuerystring {
+  view?: "all" | "recent" | "favorites";
+  q?: string;
+  category?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+function getCurrentUser(request: FastifyRequest): AuthUser | undefined {
+  return (request as unknown as { user?: AuthUser }).user;
+}
+
+function getTenantId(request: FastifyRequest, currentUser?: AuthUser): string | undefined {
+  return (request.headers["x-tenant-id"] as string | undefined) ?? currentUser?.tenantId;
+}
+
+function getDb(request: FastifyRequest): unknown {
+  return (request as { db?: unknown }).db;
+}
+
 async function getAccessibleApps(
-  request: FastifyRequest,
+  request: FastifyRequest<{ Querystring: AccessibleAppsQuerystring }>,
   reply: FastifyReply
 ): Promise<void> {
-  const currentUser = request.user as { id: string; tenantId?: string } | undefined;
-
+  const currentUser = getCurrentUser(request);
   if (!currentUser) {
     return reply.status(401).send({
-      errors: [{ code: 'UNAUTHORIZED', message: 'Authentication required' }],
+      errors: [{ code: "UNAUTHORIZED", message: "Authentication required" }],
     });
   }
 
-  const tenantId = request.headers['x-tenant-id'] as string || currentUser.tenantId;
-  const activeGroupId = request.headers['x-active-group-id'] as string | null;
-
+  const tenantId = getTenantId(request, currentUser);
   if (!tenantId) {
     return reply.status(400).send({
-      errors: [{ code: 'BAD_REQUEST', message: 'Tenant ID required' }],
+      errors: [{ code: "BAD_REQUEST", message: "Tenant ID required" }],
     });
   }
 
-  try {
-    const appService = createAppService(request.db);
-    const result = await appService.getAccessibleApps(currentUser.id, tenantId, activeGroupId);
-
-    reply.status(200).send({
-      data: result,
-      meta: {
-        traceId: request.id,
-        timestamp: new Date().toISOString(),
-      },
+  const db = getDb(request);
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "SERVICE_UNAVAILABLE", message: "Database context unavailable" }],
     });
+  }
+
+  const activeGroupId = request.headers["x-active-group-id"] as string | null;
+
+  const appService = createAppService(db as any);
+  const queryInput: {
+    view?: "all" | "recent" | "favorites";
+    q?: string;
+    category?: string;
+    limit?: number;
+    cursor?: string;
+  } = {};
+
+  if (request.query.view) {
+    queryInput.view = request.query.view;
+  }
+  if (request.query.q) {
+    queryInput.q = request.query.q;
+  }
+  if (request.query.category) {
+    queryInput.category = request.query.category;
+  }
+  if (typeof request.query.limit === "number") {
+    queryInput.limit = request.query.limit;
+  }
+  if (request.query.cursor) {
+    queryInput.cursor = request.query.cursor;
+  }
+
+  const result = await appService.getAccessibleApps(currentUser.id, tenantId, activeGroupId, {
+    ...queryInput,
+  });
+
+  reply.status(200).send({
+    data: result,
+    meta: {
+      traceId: request.id,
+      timestamp: new Date().toISOString(),
+    },
+  });
+}
+
+async function getAppContextOptions(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const currentUser = getCurrentUser(request);
+  if (!currentUser) {
+    return reply.status(401).send({
+      errors: [{ code: "UNAUTHORIZED", message: "Authentication required" }],
+    });
+  }
+
+  const tenantId = getTenantId(request, currentUser);
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "BAD_REQUEST", message: "Tenant ID required" }],
+    });
+  }
+
+  const db = getDb(request);
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "SERVICE_UNAVAILABLE", message: "Database context unavailable" }],
+    });
+  }
+
+  const appService = createAppService(db as any);
+  const options = await appService.getAppContextOptions(currentUser.id, tenantId, request.params.id);
+
+  reply.status(200).send({
+    data: options,
+    meta: {
+      traceId: request.id,
+      timestamp: new Date().toISOString(),
+    },
+  });
+}
+
+async function addFavorite(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const currentUser = getCurrentUser(request);
+  if (!currentUser) {
+    return reply.status(401).send({
+      errors: [{ code: "UNAUTHORIZED", message: "Authentication required" }],
+    });
+  }
+
+  const tenantId = getTenantId(request, currentUser);
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "BAD_REQUEST", message: "Tenant ID required" }],
+    });
+  }
+
+  const db = getDb(request);
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "SERVICE_UNAVAILABLE", message: "Database context unavailable" }],
+    });
+  }
+
+  const appService = createAppService(db as any);
+  try {
+    await appService.addFavorite(currentUser.id, tenantId, request.params.id);
+    reply.status(204).send();
   } catch (error) {
-    if (error instanceof Error) {
-      return reply.status(500).send({
-        errors: [{ code: 'INTERNAL_ERROR', message: error.message }],
+    if (error instanceof DuplicateFavoriteError) {
+      return reply.status(409).send({
+        errors: [{ code: "CONFLICT", message: error.message }],
+      });
+    }
+    if (error instanceof FavoriteLimitExceededError) {
+      return reply.status(409).send({
+        errors: [{ code: "CONFLICT", message: error.message }],
+      });
+    }
+    if (error instanceof AppNotAccessibleError) {
+      return reply.status(403).send({
+        errors: [{ code: "FORBIDDEN", message: error.message }],
+      });
+    }
+    if (error instanceof AppNotFoundError) {
+      return reply.status(404).send({
+        errors: [{ code: "NOT_FOUND", message: error.message }],
       });
     }
     throw error;
   }
 }
 
-/**
- * T077 [P] [US3] Create GET /apps/:id/context-options route
- * T119 [P] [US7] Get context options for a specific app
- */
-async function getAppContextOptions(
+async function removeFavorite(
   request: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
 ): Promise<void> {
-  const currentUser = request.user as { id: string; tenantId?: string } | undefined;
-
+  const currentUser = getCurrentUser(request);
   if (!currentUser) {
     return reply.status(401).send({
-      errors: [{ code: 'UNAUTHORIZED', message: 'Authentication required' }],
+      errors: [{ code: "UNAUTHORIZED", message: "Authentication required" }],
     });
   }
 
-  const tenantId = request.headers['x-tenant-id'] as string || currentUser.tenantId;
-  const appId = request.params.id;
-
+  const tenantId = getTenantId(request, currentUser);
   if (!tenantId) {
     return reply.status(400).send({
-      errors: [{ code: 'BAD_REQUEST', message: 'Tenant ID required' }],
+      errors: [{ code: "BAD_REQUEST", message: "Tenant ID required" }],
     });
   }
 
-  try {
-    const appService = createAppService(request.db);
-    const options = await appService.getAppContextOptions(currentUser.id, tenantId, appId);
-
-    reply.status(200).send({
-      data: options,
-      meta: {
-        traceId: request.id,
-        timestamp: new Date().toISOString(),
-      },
+  const db = getDb(request);
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "SERVICE_UNAVAILABLE", message: "Database context unavailable" }],
     });
+  }
+
+  const appService = createAppService(db as any);
+  await appService.removeFavorite(currentUser.id, tenantId, request.params.id);
+
+  reply.status(204).send();
+}
+
+async function markRecentUse(
+  request: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+): Promise<void> {
+  const currentUser = getCurrentUser(request);
+  if (!currentUser) {
+    return reply.status(401).send({
+      errors: [{ code: "UNAUTHORIZED", message: "Authentication required" }],
+    });
+  }
+
+  const tenantId = getTenantId(request, currentUser);
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "BAD_REQUEST", message: "Tenant ID required" }],
+    });
+  }
+
+  const db = getDb(request);
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "SERVICE_UNAVAILABLE", message: "Database context unavailable" }],
+    });
+  }
+
+  const appService = createAppService(db as any);
+  try {
+    await appService.markRecentUse(currentUser.id, tenantId, request.params.id);
+    reply.status(204).send();
   } catch (error) {
-    if (error instanceof Error) {
-      return reply.status(404).send({
-        errors: [{ code: 'NOT_FOUND', message: error.message }],
+    if (error instanceof AppNotAccessibleError) {
+      return reply.status(403).send({
+        errors: [{ code: "FORBIDDEN", message: error.message }],
       });
     }
-    return reply.status(500).send({
-      errors: [{ code: 'INTERNAL_ERROR', message: 'Internal server error' }],
-    });
+    if (error instanceof AppNotFoundError) {
+      return reply.status(404).send({
+        errors: [{ code: "NOT_FOUND", message: error.message }],
+      });
+    }
+    throw error;
   }
 }
 
-// =============================================================================
-// Route Registration
-// =============================================================================
-
 export async function appsRoutes(fastify: FastifyInstance): Promise<void> {
   fastify.get<{
-    Querystring: { activeGroupId?: string };
-  }>(
-    '/apps/accessible',
-    {
-      schema: {
-        description: 'T120 [P] [US7] Get apps accessible to user with context information',
-        tags: ['Apps', 'Context Switching'],
-        querystring: {
-          type: 'object',
-          properties: {
-            activeGroupId: {
-              type: 'string',
-              description: 'Current active group ID from header override',
-            },
-          },
+    Querystring: AccessibleAppsQuerystring;
+  }>("/apps/accessible", {
+    schema: {
+      description: "Get accessible apps with workbench filters",
+      tags: ["Apps", "Workbench"],
+      querystring: {
+        type: "object",
+        properties: {
+          view: { type: "string", enum: ["all", "recent", "favorites"] },
+          q: { type: "string", maxLength: 100 },
+          category: { type: "string" },
+          limit: { type: "number", minimum: 1, maximum: 100 },
+          cursor: { type: "string" },
         },
-        headers: new FastifyJsonSchema({
-          type: 'object',
-          properties: {
-            'x-active-group-id': {
-              type: 'string',
-              description: 'Active group ID',
-            },
-          },
-        }),
-        response: {
-          200: {
-            description: 'Accessible apps with context',
-            type: 'object',
-            properties: {
-              data: {
-                type: 'object',
-                properties: {
-                  apps: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        id: { type: 'string' },
-                        name: { type: 'string' },
-                        currentGroup: {
-                          type: 'object',
-                          properties: {
-                            groupId: { type: 'string' },
-                            groupName: { type: 'string' },
-                            hasAccess: { type: 'boolean' },
-                          },
-                        },
-                        availableGroups: {
-                          type: 'array',
-                          items: {
-                            type: 'object',
-                            properties: {
-                              groupId: { type: 'string' },
-                              groupName: { type: 'string' },
-                              hasAccess: { type: 'boolean' },
-                            },
-                          },
-                        },
-                        requiresSwitch: { type: 'boolean' },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
+      },
+      headers: {
+        type: "object",
+        properties: {
+          "x-active-group-id": { type: "string" },
         },
       },
     },
-    getAccessibleApps
-  );
+  }, getAccessibleApps);
 
   fastify.get<{
     Params: { id: string };
-  }>(
-    '/apps/:id/context-options',
-    {
-      schema: {
-        description: 'T119 [P] [US7] Get context options for a specific app',
-        tags: ['Apps', 'Context Switching'],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: {
-              type: 'string',
-              description: 'App ID',
-            },
-          },
-        },
-        response: {
-          200: {
-            description: 'Context options for app',
-            type: 'object',
-            properties: {
-              data: {
-                type: 'object',
-                properties: {
-                  currentGroup: {
-                    type: 'object',
-                    properties: {
-                      groupId: { type: 'string' },
-                      groupName: { type: 'string' },
-                      hasAccess: { type: 'boolean' },
-                    },
-                  },
-                  availableGroups: {
-                    type: 'array',
-                    items: {
-                      type: 'object',
-                      properties: {
-                        groupId: { type: 'string' },
-                        groupName: { type: 'string' },
-                        hasAccess: { type: 'boolean' },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
+  }>("/apps/:id/context-options", {
+    schema: {
+      description: "Get context options for a specific app",
+      tags: ["Apps", "Context Switching"],
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          id: { type: "string" },
         },
       },
     },
-    getAppContextOptions
-  );
+  }, getAppContextOptions);
+
+  fastify.post<{
+    Params: { id: string };
+  }>("/apps/:id/favorite", {
+    schema: {
+      description: "Mark app as favorite",
+      tags: ["Apps", "Workbench"],
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          id: { type: "string" },
+        },
+      },
+    },
+  }, addFavorite);
+
+  fastify.delete<{
+    Params: { id: string };
+  }>("/apps/:id/favorite", {
+    schema: {
+      description: "Remove app from favorites",
+      tags: ["Apps", "Workbench"],
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          id: { type: "string" },
+        },
+      },
+    },
+  }, removeFavorite);
+
+  fastify.post<{
+    Params: { id: string };
+  }>("/apps/:id/recent-use", {
+    schema: {
+      description: "Record app recent usage for current user",
+      tags: ["Apps", "Workbench"],
+      params: {
+        type: "object",
+        required: ["id"],
+        properties: {
+          id: { type: "string" },
+        },
+      },
+    },
+  }, markRecentUse);
 }

@@ -157,8 +157,8 @@ export class BreakglassService implements IBreakglassService {
       }): Promise<void>;
     },
     private notificationStore?: {
-      create(notification: Omit<BreakglassNotification, 'id'>): Promise<string>;
-      findByTenant(tenantId: string): Promise<BreakglassNotification[]>;
+      create(notification: Record<string, unknown>): Promise<string>;
+      findByTenant(tenantId: string): Promise<Array<Record<string, unknown>>>;
       markAsRead(notificationId: string): Promise<void>;
     }
   ) {}
@@ -442,7 +442,8 @@ export class BreakglassService implements IBreakglassService {
    */
   async getBreakglassNotifications(tenantId: string): Promise<BreakglassNotification[]> {
     if (this.notificationStore) {
-      return this.notificationStore.findByTenant(tenantId);
+      const rows = await this.notificationStore.findByTenant(tenantId);
+      return rows as BreakglassNotification[];
     }
 
     // Fallback: return notifications from in-memory store

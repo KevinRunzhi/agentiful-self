@@ -16,3 +16,4 @@ export * from "./password-history.js";
 export * from "./sso-config.js";
 export * from "./mfa-secret.js";
 export * from "./rbac.js";
+export * from "./quota.js";

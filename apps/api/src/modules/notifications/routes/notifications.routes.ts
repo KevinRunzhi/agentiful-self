@@ -1,48 +1,161 @@
 /**
  * Notification Routes
  *
- * API routes for notifications (S1-2 User Story 6).
- *
- * Endpoints:
- * - GET /notifications/unread-count - Get unread notification count
- * - GET /notifications/breakglass - Get break-glass notifications
- * - PATCH /notifications/:id/read - Mark notification as read
- * - PATCH /notifications/read-all - Mark all notifications as read
+ * S1-3 APIs:
+ * - GET /notifications (cursor pagination)
+ * - GET /notifications/unread-count
+ * - PATCH /notifications/:id/read
  */
 
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { createNotificationStore } from '../services/notification.service';
-
-// =============================================================================
-// Types
-// =============================================================================
+import { getDatabase } from "@agentifui/db/client";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { createNotificationService } from "../services/notification.service";
 
 interface NotificationParams {
   id: string;
 }
 
-// =============================================================================
-// Route Handlers
-// =============================================================================
+interface NotificationQuerystring {
+  cursor?: string;
+  limit?: number;
+  type?: string;
+  unreadOnly?: string;
+}
 
-/**
- * T113 [P] [US6] Create GET /notifications/unread-count route
- */
-async function getUnreadCount(
-  request: FastifyRequest,
+function getTenantId(request: FastifyRequest): string | undefined {
+  const fromQuery = (request.query as { tenantId?: string } | undefined)?.tenantId;
+  if (typeof fromQuery === "string" && fromQuery.trim().length > 0) {
+    return fromQuery.trim();
+  }
+
+  const fromContext = (request.tenant as { id?: string } | undefined)?.id;
+  if (fromContext) {
+    return fromContext;
+  }
+
+  const fromHeader = request.headers["x-tenant-id"];
+  if (typeof fromHeader === "string" && fromHeader.trim().length > 0) {
+    return fromHeader.trim();
+  }
+
+  return undefined;
+}
+
+function getRecipientId(request: FastifyRequest): string | undefined {
+  const userFromContext = (request as unknown as { user?: { id?: string } }).user?.id;
+  if (userFromContext && userFromContext.trim().length > 0) {
+    return userFromContext.trim();
+  }
+
+  const fromHeader = request.headers["x-user-id"];
+  if (typeof fromHeader === "string" && fromHeader.trim().length > 0) {
+    return fromHeader.trim();
+  }
+
+  return undefined;
+}
+
+function getDb(request: FastifyRequest): unknown {
+  const dbFromRequest = (request as { db?: unknown }).db;
+  const dbFromServer = (request.server as { db?: unknown }).db;
+  if (dbFromRequest || dbFromServer) {
+    return dbFromRequest ?? dbFromServer;
+  }
+
+  try {
+    return getDatabase();
+  } catch {
+    return undefined;
+  }
+}
+
+function parseBoolean(value: string | undefined): boolean {
+  return value === "true";
+}
+
+async function getNotifications(
+  request: FastifyRequest<{ Querystring: NotificationQuerystring }>,
   reply: FastifyReply
 ): Promise<void> {
-  const tenantId = (request.tenant as { id: string })?.id;
+  const tenantId = getTenantId(request);
+  const recipientId = getRecipientId(request);
+  const db = getDb(request);
 
   if (!tenantId) {
     return reply.status(400).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Tenant context required' }],
+      errors: [{ code: "AFUI_IAM_001", message: "Tenant context required" }],
+    });
+  }
+
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Database context unavailable" }],
     });
   }
 
   try {
-    const notificationStore = createNotificationStore();
-    const count = await notificationStore.getUnreadCount(tenantId);
+    const notificationService = createNotificationService(db as any);
+    const result = recipientId
+      ? await notificationService.findByRecipient(tenantId, recipientId, {
+          cursor: request.query.cursor ?? null,
+          limit: request.query.limit,
+          type: request.query.type,
+          unreadOnly: parseBoolean(request.query.unreadOnly),
+        })
+      : {
+          items: (await notificationService.findByTenant(tenantId)).slice(0, request.query.limit ?? 20),
+          nextCursor: null,
+        };
+
+    reply.status(200).send({
+      data: {
+        items: result.items.map((item) => ({
+          id: item.id,
+          type: item.type,
+          title: item.title,
+          message: item.message,
+          metadata: item.metadata,
+          createdAt: item.createdAt,
+          isRead: item.isRead,
+          readAt: item.readAt ?? null,
+        })),
+        nextCursor: result.nextCursor,
+      },
+      meta: {
+        traceId: request.id,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch {
+    reply.status(500).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Internal server error" }],
+    });
+  }
+}
+
+async function getUnreadCount(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const tenantId = getTenantId(request);
+  const recipientId = getRecipientId(request);
+  const db = getDb(request);
+
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Tenant context required" }],
+    });
+  }
+
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Database context unavailable" }],
+    });
+  }
+
+  try {
+    const notificationService = createNotificationService(db as any);
+    const count = await notificationService.getUnreadCount(tenantId, recipientId);
 
     reply.status(200).send({
       data: count,
@@ -51,266 +164,218 @@ async function getUnreadCount(
         timestamp: new Date().toISOString(),
       },
     });
-  } catch (error) {
+  } catch {
     reply.status(500).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Internal server error' }],
+      errors: [{ code: "AFUI_IAM_001", message: "Internal server error" }],
     });
   }
 }
 
-/**
- * T113 [P] [US6] Create GET /notifications/breakglass route
- */
-async function getBreakglassNotifications(
-  request: FastifyRequest,
-  reply: FastifyReply
-): Promise<void> {
-  const tenantId = (request.tenant as { id: string })?.id;
-
-  if (!tenantId) {
-    return reply.status(400).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Tenant context required' }],
-    });
-  }
-
-  try {
-    const notificationStore = createNotificationStore();
-    const notifications = await notificationStore.findByTenant(tenantId);
-
-    // Filter only break-glass related notifications
-    const breakglassNotifications = notifications.filter(
-      (n) => n.type === 'breakglass_activated' || n.type === 'breakglass_expired'
-    );
-
-    // Get user info for rootAdminName
-    const enrichedNotifications = await Promise.all(
-      breakglassNotifications.map(async (notification) => {
-        // Try to get user info from database
-        let rootAdminName: string | undefined;
-        try {
-          const userResult = await request.db
-            .select({ name: request.users?.name })
-            .from(request.users || 'users')
-            .where(eq(request.users?.id || 'id', notification.rootAdminId))
-            .limit(1);
-
-          if (userResult.length > 0) {
-            rootAdminName = userResult[0].name;
-          }
-        } catch {
-          // User lookup failed, continue without name
-        }
-
-        return {
-          id: notification.id,
-          type: notification.type,
-          message: formatNotificationMessage(notification),
-          metadata: {
-            rootAdminId: notification.rootAdminId,
-            rootAdminName,
-            reason: notification.reason,
-            expiresAt: notification.expiresAt,
-          },
-          createdAt: notification.createdAt,
-          isRead: notification.isRead,
-        };
-      })
-    );
-
-    reply.status(200).send({
-      data: enrichedNotifications,
-      meta: {
-        traceId: request.id,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    reply.status(500).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Internal server error' }],
-    });
-  }
-}
-
-/**
- * Mark notification as read
- */
 async function markAsRead(
   request: FastifyRequest<{ Params: NotificationParams }>,
   reply: FastifyReply
 ): Promise<void> {
-  const { id } = request.params;
+  const tenantId = getTenantId(request);
+  const recipientId = getRecipientId(request);
+  const db = getDb(request);
+
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Tenant context required" }],
+    });
+  }
+
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Database context unavailable" }],
+    });
+  }
 
   try {
-    const notificationStore = createNotificationStore();
-    await notificationStore.markAsRead(id);
-
+    const notificationService = createNotificationService(db as any);
+    await notificationService.markAsRead(request.params.id, tenantId, recipientId);
     reply.status(204).send();
-  } catch (error) {
+  } catch {
     reply.status(500).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Internal server error' }],
+      errors: [{ code: "AFUI_IAM_001", message: "Internal server error" }],
     });
   }
 }
 
-/**
- * Mark all notifications as read
- */
 async function markAllAsRead(
   request: FastifyRequest,
   reply: FastifyReply
 ): Promise<void> {
-  const tenantId = (request.tenant as { id: string })?.id;
+  const tenantId = getTenantId(request);
+  const recipientId = getRecipientId(request);
+  const db = getDb(request);
 
   if (!tenantId) {
     return reply.status(400).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Tenant context required' }],
+      errors: [{ code: "AFUI_IAM_001", message: "Tenant context required" }],
+    });
+  }
+
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Database context unavailable" }],
     });
   }
 
   try {
-    const notificationStore = createNotificationStore();
-    await notificationStore.markAllAsRead(tenantId);
-
+    const notificationService = createNotificationService(db as any);
+    await notificationService.markAllAsRead(tenantId, recipientId);
     reply.status(204).send();
-  } catch (error) {
+  } catch {
     reply.status(500).send({
-      errors: [{ code: 'AFUI_IAM_001', message: 'Internal server error' }],
+      errors: [{ code: "AFUI_IAM_001", message: "Internal server error" }],
     });
   }
 }
 
-// =============================================================================
-// Helper Functions
-// =============================================================================
+async function getBreakglassNotifications(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const tenantId = getTenantId(request);
+  const db = getDb(request);
 
-function formatNotificationMessage(notification: {
-  type: string;
-  createdAt: Date;
-  expiresAt: Date;
-}): string {
-  const timeStr = notification.createdAt.toLocaleString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-
-  if (notification.type === 'breakglass_activated') {
-    return `ROOT ADMIN 于 ${timeStr} 访问了本租户`;
-  } else if (notification.type === 'breakglass_expired') {
-    return `Break-glass 会话已过期`;
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Tenant context required" }],
+    });
+  }
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Database context unavailable" }],
+    });
   }
 
-  return '未知通知类型';
+  const notificationService = createNotificationService(db as any);
+  const rows = await notificationService.findByTenant(tenantId);
+  const items = rows.filter((row) =>
+    ["breakglass", "breakglass_activated", "breakglass_expired"].includes(row.type)
+  );
+
+  reply.status(200).send({
+    data: items,
+    meta: {
+      traceId: request.id,
+      timestamp: new Date().toISOString(),
+    },
+  });
 }
 
-// =============================================================================
-// Route Registration
-// =============================================================================
+async function getQuotaNotifications(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
+  const tenantId = getTenantId(request);
+  const db = getDb(request);
+
+  if (!tenantId) {
+    return reply.status(400).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Tenant context required" }],
+    });
+  }
+  if (!db) {
+    return reply.status(503).send({
+      errors: [{ code: "AFUI_IAM_001", message: "Database context unavailable" }],
+    });
+  }
+
+  const notificationService = createNotificationService(db as any);
+  const rows = await notificationService.findByTenant(tenantId);
+  const items = rows.filter((row) =>
+    ["quota_alert", "quota_warning", "quota_exceeded"].includes(row.type)
+  );
+
+  reply.status(200).send({
+    data: items,
+    meta: {
+      traceId: request.id,
+      timestamp: new Date().toISOString(),
+    },
+  });
+}
 
 export async function notificationRoutes(fastify: FastifyInstance): Promise<void> {
-  fastify.get(
-    '/notifications/unread-count',
+  fastify.get<{
+    Querystring: NotificationQuerystring;
+  }>(
+    "/notifications",
     {
       schema: {
-        description: 'Get unread notification count',
-        tags: ['Notifications'],
-        response: {
-          200: {
-            description: 'Unread count',
-            type: 'object',
-            properties: {
-              data: {
-                type: 'object',
-                properties: {
-                  total: { type: 'number' },
-                  breakglass: { type: 'number' },
-                  other: { type: 'number' },
-                },
-              },
-            },
+        description: "List in-app notifications",
+        tags: ["Notifications"],
+        querystring: {
+          type: "object",
+          properties: {
+            cursor: { type: "string" },
+            limit: { type: "number", minimum: 1, maximum: 100 },
+            type: { type: "string" },
+            unreadOnly: { type: "string", enum: ["true", "false"] },
           },
         },
+      },
+    },
+    getNotifications
+  );
+
+  fastify.get(
+    "/notifications/unread-count",
+    {
+      schema: {
+        description: "Get unread notification count",
+        tags: ["Notifications"],
       },
     },
     getUnreadCount
   );
 
   fastify.get(
-    '/notifications/breakglass',
+    "/notifications/breakglass",
     {
       schema: {
-        description: 'Get break-glass notifications',
-        tags: ['Notifications'],
-        response: {
-          200: {
-            description: 'Break-glass notifications',
-            type: 'object',
-            properties: {
-              data: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    type: { type: 'string' },
-                    message: { type: 'string' },
-                    metadata: { type: 'object' },
-                    createdAt: { type: 'string', format: 'date-time' },
-                    isRead: { type: 'boolean' },
-                  },
-                },
-              },
-            },
-          },
-        },
+        description: "List break-glass notifications (compat endpoint)",
+        tags: ["Notifications"],
       },
+    },
     getBreakglassNotifications
+  );
+
+  fastify.get(
+    "/notifications/quota",
+    {
+      schema: {
+        description: "List quota notifications (compat endpoint)",
+        tags: ["Notifications"],
+      },
+    },
+    getQuotaNotifications
   );
 
   fastify.patch<{
     Params: NotificationParams;
   }>(
-    '/notifications/:id/read',
+    "/notifications/:id/read",
     {
       schema: {
-        description: 'Mark notification as read',
-        tags: ['Notifications'],
-        params: {
-          type: 'object',
-          required: ['id'],
-          properties: {
-            id: { type: 'string' },
-          },
-        },
-        response: {
-          204: {
-            description: 'Notification marked as read',
-            type: 'null',
-          },
-        },
+        description: "Mark notification as read",
+        tags: ["Notifications"],
       },
     },
     markAsRead
   );
 
   fastify.patch(
-    '/notifications/read-all',
+    "/notifications/read-all",
     {
       schema: {
-        description: 'Mark all notifications as read',
-        tags: ['Notifications'],
-        response: {
-          204: {
-            description: 'All notifications marked as read',
-            type: 'null',
-          },
-        },
+        description: "Mark all notifications as read",
+        tags: ["Notifications"],
       },
     },
     markAllAsRead
   );
 }
-
-// Import for type checking
-import { eq } from 'drizzle-orm';

@@ -83,7 +83,7 @@ export async function signUpWithEmailPassword(data: {
   const passwordValidation = validatePassword(password);
   if (!passwordValidation.valid) {
     throw new Error(passwordValidation.errors.join(", "));
-  });
+  }
 
   // Check if user already exists
   const db = getDatabase();
