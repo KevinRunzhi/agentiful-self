@@ -31,7 +31,18 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+基于 `.specify.specify/memory/constitution.md` 的合规检查：
+
+- [ ] **切片驱动开发**：功能是否可端到端演示？切片契约是否已冻结？
+- [ ] **MVP 优先**：是否优先实现核心用户价值？是否有降级方案？
+- [ ] **TypeScript 全栈**：是否使用严格类型检查？共享类型是否定义？
+- [ ] **可观测性优先**：Trace ID 是否贯穿全链路？审计事件是否覆盖？
+- [ ] **多租户原生**：所有实体是否包含 tenant_id？数据隔离是否保证？
+- [ ] **统一接口网关**：API 契约是否符合 GATEWAY_CONTRACT_P1.md？
+- [ ] **技术栈锁定**：是否遵循 TECHNOLOGY_STACK.md 的选型？
+- [ ] **目录结构规范**：代码组织是否符合 REPO_STRUCTURE.md？
+
+违反宪章的设计需要提供理由记录在 plan.md 的 Complexity Tracking 表中。
 
 ## Project Structure
 
