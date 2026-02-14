@@ -1,16 +1,26 @@
 /**
  * App Service
  *
- * Service for managing application context and smart switching (T119-T120, User Story 7).
- * Handles app accessibility and context options for multi-group users.
+ * S1-3 workbench service for:
+ * - Accessible app listing (all/recent/favorites)
+ * - Context options
+ * - Favorite and recent usage operations
  */
 
-import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { eq, and, or, sql, inArray } from 'drizzle-orm';
-import { app } from '@agentifui/db/schema/rbac';
-import { appGrant } from '@agentifui/db/schema/rbac';
-import { groupMember } from '@agentifui/db/schema/group-member';
-import { rbacRole, rbacUserRole, permission, rolePermission } from '@agentifui/db/schema/rbac';
+import type { PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { and, asc, desc, eq, ilike, inArray, lt, or, sql } from "drizzle-orm";
+import {
+  app,
+  appGrant,
+  permission,
+  rbacRole,
+  rbacUserRole,
+  rolePermission,
+  group,
+  groupMember,
+  appFavorite,
+  appRecentUse,
+} from "@agentifui/db/schema";
 
 // =============================================================================
 // Types
@@ -25,10 +35,18 @@ export interface AppContextOption {
 export interface AppWithContext {
   id: string;
   name: string;
-  description?: string;
+  description?: string | null;
+  mode?: string;
+  icon?: string | null;
+  iconType?: string | null;
+  tags?: string[];
+  isFeatured?: boolean;
+  sortOrder?: number;
+  isFavorite?: boolean;
+  lastUsedAt?: string | null;
   currentGroup?: {
-    id: string;
-    name: string;
+    groupId: string;
+    groupName: string;
     hasAccess: boolean;
   };
   availableGroups: AppContextOption[];
@@ -36,7 +54,59 @@ export interface AppWithContext {
 }
 
 export interface AccessibleAppsResult {
+  // Keep `apps` for current S1-2/S1-3 E2E compatibility.
   apps: AppWithContext[];
+  // Add `items` for S1-3 API contract alignment.
+  items: AppWithContext[];
+  nextCursor: string | null;
+}
+
+export interface AccessibleAppsQuery {
+  view?: "all" | "recent" | "favorites";
+  q?: string;
+  category?: string;
+  limit?: number;
+  cursor?: string;
+}
+
+interface UserGroupMembership {
+  groupId: string;
+  groupName: string;
+}
+
+interface AccessMaps {
+  userAllow: Set<string>;
+  userDeny: Set<string>;
+  groupAllow: Map<string, Set<string>>;
+  groupDeny: Map<string, Set<string>>;
+}
+
+export class DuplicateFavoriteError extends Error {
+  constructor() {
+    super("Application is already favorited");
+    this.name = "DuplicateFavoriteError";
+  }
+}
+
+export class FavoriteLimitExceededError extends Error {
+  constructor(limit: number) {
+    super(`Favorite limit exceeded (max ${limit})`);
+    this.name = "FavoriteLimitExceededError";
+  }
+}
+
+export class AppNotAccessibleError extends Error {
+  constructor() {
+    super("Application is not accessible");
+    this.name = "AppNotAccessibleError";
+  }
+}
+
+export class AppNotFoundError extends Error {
+  constructor() {
+    super("Application not found");
+    this.name = "AppNotFoundError";
+  }
 }
 
 // =============================================================================
@@ -44,20 +114,13 @@ export interface AccessibleAppsResult {
 // =============================================================================
 
 export interface IAppService {
-  /**
-   * T120 [P] [US7] Add context-aware filtering to getAccessibleApps
-   * Get all apps accessible to user, with context information
-   */
   getAccessibleApps(
     userId: string,
     tenantId: string,
-    activeGroupId?: string | null
+    activeGroupId?: string | null,
+    query?: AccessibleAppsQuery
   ): Promise<AccessibleAppsResult>;
 
-  /**
-   * T119 [P] [US7] Implement getAppContextOptions method
-   * Get available group context options for a specific app
-   */
   getAppContextOptions(
     userId: string,
     tenantId: string,
@@ -67,9 +130,6 @@ export interface IAppService {
     availableGroups: AppContextOption[];
   }>;
 
-  /**
-   * Check if user has access to an app
-   */
   hasAppAccess(
     userId: string,
     tenantId: string,
@@ -77,14 +137,15 @@ export interface IAppService {
     activeGroupId?: string | null
   ): Promise<boolean>;
 
-  /**
-   * Get apps for a specific group context
-   */
   getAppsForGroup(
     userId: string,
     tenantId: string,
     groupId: string
   ): Promise<AppWithContext[]>;
+
+  addFavorite(userId: string, tenantId: string, appId: string): Promise<void>;
+  removeFavorite(userId: string, tenantId: string, appId: string): Promise<void>;
+  markRecentUse(userId: string, tenantId: string, appId: string): Promise<void>;
 }
 
 // =============================================================================
@@ -92,77 +153,159 @@ export interface IAppService {
 // =============================================================================
 
 export class AppService implements IAppService {
-  constructor(private db: PostgresJsDatabase) {}
+  constructor(private readonly db: PostgresJsDatabase) {}
 
-  /**
-   * T120 [P] [US7] Add context-aware filtering to getAccessibleApps
-   */
   async getAccessibleApps(
     userId: string,
     tenantId: string,
-    activeGroupId?: string | null
+    activeGroupId?: string | null,
+    query: AccessibleAppsQuery = {}
   ): Promise<AccessibleAppsResult> {
-    // Get all apps in the tenant
-    const tenantApps = await this.db
-      .select()
-      .from(app)
-      .where(eq(app.tenantId, tenantId))
-      .orderBy(app.name);
+    const normalizedView = query.view ?? "all";
+    const normalizedLimit = this.normalizeLimit(query.limit);
+    const keyword = this.normalizeKeyword(query.q);
+    const apps = await this.findTenantApps(tenantId, query);
+
+    if (apps.length === 0) {
+      return { apps: [], items: [], nextCursor: null };
+    }
+
+    const userGroups = await this.getUserGroups(userId, tenantId);
+    const hasGlobalAccess = await this.hasGlobalAppUsePermission(userId, tenantId);
+    const appIds = apps.map((a) => a.id);
+    const groupIds = userGroups.map((g) => g.groupId);
+    const accessMaps = await this.loadAccessMaps(appIds, groupIds, userId);
+    const favoriteMap = await this.getFavoriteMap(tenantId, userId, appIds);
+    const recentMap = await this.getRecentUseMap(tenantId, userId, appIds);
 
     const appContexts: AppWithContext[] = [];
 
-    for (const appRecord of tenantApps) {
-      // Get context options for this app
-      const { availableGroups, currentGroup } = await this.getAppContextOptions(
-        userId,
-        tenantId,
-        appRecord.id
-      );
-
-      // Determine if switch is required
-      // If no groups have access, skip this app
-      const accessibleGroups = availableGroups.filter((g) => g.hasAccess);
-      if (accessibleGroups.length === 0) {
+    for (const appRecord of apps) {
+      const userDenied = accessMaps.userDeny.has(appRecord.id);
+      if (userDenied) {
         continue;
       }
 
-      // Determine current group context
-      let currentGroupContext: AppContextOption | undefined;
-      if (activeGroupId) {
-        const currentHasAccess = availableGroups.find((g) => g.groupId === activeGroupId)?.hasAccess;
-        if (currentHasAccess) {
-          currentGroupContext = {
-            groupId: activeGroupId,
-            groupName: availableGroups.find((g) => g.groupId === activeGroupId)?.groupName || '',
-            hasAccess: true,
+      const availableGroups = userGroups
+        .map((member) => {
+          const groupDenied = accessMaps.groupDeny.get(appRecord.id)?.has(member.groupId) ?? false;
+          const groupAllowed = accessMaps.groupAllow.get(appRecord.id)?.has(member.groupId) ?? false;
+          const hasAccess = !groupDenied && (groupAllowed || accessMaps.userAllow.has(appRecord.id) || hasGlobalAccess);
+
+          return {
+            groupId: member.groupId,
+            groupName: member.groupName,
+            hasAccess,
           };
-        }
+        })
+        .filter((groupOption) => groupOption.hasAccess);
+
+      if (availableGroups.length === 0 && (accessMaps.userAllow.has(appRecord.id) || hasGlobalAccess)) {
+        availableGroups.push({
+          groupId: `user:${userId}`,
+          groupName: "Personal Access",
+          hasAccess: true,
+        });
       }
 
-      // Requires switch if:
-      // 1. No current group set, OR
-      // 2. Current group doesn't have access, OR
-      // 3. Multiple groups have access (ambiguous)
-      const requiresSwitch = !currentGroupContext ||
-                           !currentGroupContext.hasAccess ||
-                           accessibleGroups.filter((g) => g.hasAccess).length > 1;
+      if (availableGroups.length === 0) {
+        continue;
+      }
 
-      appContexts.push({
+      let currentGroupContext: AppContextOption | undefined;
+      if (activeGroupId) {
+        currentGroupContext = availableGroups.find((groupOption) => groupOption.groupId === activeGroupId);
+      }
+      if (!currentGroupContext && availableGroups.length === 1) {
+        currentGroupContext = availableGroups[0];
+      }
+
+      const requiresSwitch = availableGroups.length > 1 && !currentGroupContext;
+
+      const appItem: AppWithContext = {
         id: appRecord.id,
         name: appRecord.name,
-        currentGroup: currentGroupContext,
-        availableGroups: accessibleGroups,
+        description: appRecord.description ?? null,
+        mode: appRecord.mode,
+        icon: appRecord.icon ?? null,
+        iconType: appRecord.iconType ?? null,
+        tags: this.toStringArray(appRecord.tags),
+        isFeatured: appRecord.isFeatured,
+        sortOrder: appRecord.sortOrder,
+        isFavorite: favoriteMap.has(appRecord.id),
+        lastUsedAt: recentMap.get(appRecord.id) ?? null,
+        availableGroups,
         requiresSwitch,
+      };
+
+      if (currentGroupContext) {
+        appItem.currentGroup = currentGroupContext;
+      }
+
+      appContexts.push(appItem);
+    }
+
+    let filtered = appContexts;
+
+    if (normalizedView === "favorites") {
+      filtered = filtered
+        .filter((appItem) => appItem.isFavorite)
+        .sort((a, b) => {
+          const t1 = favoriteMap.get(a.id)?.getTime() ?? 0;
+          const t2 = favoriteMap.get(b.id)?.getTime() ?? 0;
+          return t2 - t1;
+        });
+    } else if (normalizedView === "recent") {
+      filtered = filtered
+        .filter((appItem) => Boolean(appItem.lastUsedAt))
+        .sort((a, b) => {
+          const t1 = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+          const t2 = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+          return t2 - t1;
+        })
+        .slice(0, 10);
+    } else {
+      filtered = [...filtered].sort((a, b) => {
+        if (keyword) {
+          const scoreDelta = this.computeSearchScore(b, keyword) - this.computeSearchScore(a, keyword);
+          if (scoreDelta !== 0) {
+            return scoreDelta;
+          }
+          const lastUsedDelta =
+            (b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0) -
+            (a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0);
+          if (lastUsedDelta !== 0) {
+            return lastUsedDelta;
+          }
+        }
+
+        const featuredDelta = Number(b.isFeatured ?? false) - Number(a.isFeatured ?? false);
+        if (featuredDelta !== 0) {
+          return featuredDelta;
+        }
+
+        const sortOrderDelta = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+        if (sortOrderDelta !== 0) {
+          return sortOrderDelta;
+        }
+
+        return a.name.localeCompare(b.name);
       });
     }
 
-    return { apps: appContexts };
+    const startIndex = this.resolveCursorIndex(filtered, query.cursor);
+    const effectiveLimit = normalizedView === "recent" ? Math.min(normalizedLimit, 10) : normalizedLimit;
+    const items = filtered.slice(startIndex, startIndex + effectiveLimit);
+    const hasMore = filtered.length > startIndex + effectiveLimit;
+    const nextCursor = hasMore ? items[items.length - 1]?.id ?? null : null;
+
+    return {
+      apps: items,
+      items,
+      nextCursor,
+    };
   }
 
-  /**
-   * T119 [P] [US7] Implement getAppContextOptions method
-   * Returns available groups and their access status for an app
-   */
   async getAppContextOptions(
     userId: string,
     tenantId: string,
@@ -171,179 +314,44 @@ export class AppService implements IAppService {
     currentGroup?: AppContextOption;
     availableGroups: AppContextOption[];
   }> {
-    // Get all user's groups in this tenant
-    const userGroups = await this.db
-      .select({
-        groupId: groupMember.groupId,
-      })
-      .from(groupMember)
-      .where(eq(groupMember.userId, userId));
+    const userGroups = await this.getUserGroups(userId, tenantId);
+    const hasGlobalAccess = await this.hasGlobalAppUsePermission(userId, tenantId);
+    const accessMaps = await this.loadAccessMaps(
+      [appId],
+      userGroups.map((groupMember) => groupMember.groupId),
+      userId
+    );
 
-    if (userGroups.length === 0) {
+    if (accessMaps.userDeny.has(appId)) {
       return { availableGroups: [] };
     }
 
-    const groupIds = userGroups.map((g) => g.groupId);
+    const availableGroups: AppContextOption[] = userGroups.map((member) => {
+      const denied = accessMaps.groupDeny.get(appId)?.has(member.groupId) ?? false;
+      const allowed = accessMaps.groupAllow.get(appId)?.has(member.groupId) ?? false;
+      const hasAccess = !denied && (allowed || accessMaps.userAllow.has(appId) || hasGlobalAccess);
 
-    // Get app:use permission for this user across all contexts
-    // This includes: user direct grants, group grants, role permissions
-    const userPermissions = await this.getUserAppPermissions(userId, tenantId);
-
-    // Check each group's access to this app
-    const availableGroups: AppContextOption[] = [];
-
-    for (const group of userGroups) {
-      // Check if group has access to this app
-      const groupGrantAccess = await this.checkGroupAccess(appId, group.groupId);
-      const hasAccess = groupGrantAccess || userPermissions.includes(appId);
-
-      // Get group name (would need to join with group table)
-      // For now, use groupId as placeholder
-      availableGroups.push({
-        groupId: group.groupId,
-        groupName: `Group ${group.groupId.substring(0, 8)}`,
+      return {
+        groupId: member.groupId,
+        groupName: member.groupName,
         hasAccess,
-      });
-    }
+      };
+    });
 
-    // Check for user direct grants (highest priority)
-    const userDirectGrants = await this.db
-      .select()
-      .from(appGrant)
-      .where(
-        and(
-          eq(appGrant.appId, appId),
-          eq(appGrant.granteeType, 'user'),
-          eq(appGrant.granteeId, userId),
-          eq(appGrant.permission, 'use')
-        )
-      );
-
-    // If user has direct grant, add as a "personal" context option
-    if (userDirectGrants.length > 0) {
+    if (availableGroups.length === 0 && (accessMaps.userAllow.has(appId) || hasGlobalAccess)) {
       availableGroups.push({
-        groupId: userId, // Use userId as personal context ID
-        groupName: 'Personal Access',
+        groupId: `user:${userId}`,
+        groupName: "Personal Access",
         hasAccess: true,
       });
     }
 
+    const currentGroup = availableGroups.find((groupOption) => groupOption.hasAccess);
+    if (currentGroup) {
+      return { currentGroup, availableGroups };
+    }
+
     return { availableGroups };
-  }
-
-  /**
-   * Check if a group has access to an app via grants
-   */
-  private async checkGroupAccess(appId: string, groupId: string): Promise<boolean> {
-    const now = new Date();
-
-    const grant = await this.db
-      .select()
-      .from(appGrant)
-      .where(
-        and(
-          eq(appGrant.appId, appId),
-          eq(appGrant.granteeType, 'group'),
-          eq(appGrant.granteeId, groupId),
-          eq(appGrant.permission, 'use'),
-          or(
-            sql`${appGrant.expiresAt} IS NULL`,
-            sql`${appGrant.expiresAt} > ${now}`
-          )
-        )
-      )
-      .limit(1);
-
-    return grant.length > 0;
-  }
-
-  /**
-   * Get apps the user has permission to use via roles
-   */
-  private async getUserAppPermissions(userId: string, tenantId: string): Promise<string[]> {
-    const now = new Date();
-
-    // Get user's active roles
-    const userRoles = await this.db
-      .select({ roleId: rbacUserRole.roleId })
-      .from(rbacUserRole)
-      .where(
-        and(
-          eq(rbacUserRole.userId, userId),
-          eq(rbacUserRole.tenantId, tenantId),
-          eq(rbacRole.isActive, true),
-          or(
-            sql`${rbacUserRole.expiresAt} IS NULL`,
-            sql`${rbacUserRole.expiresAt} > ${now}`
-          )
-        )
-      );
-
-    if (userRoles.length === 0) {
-      return [];
-    }
-
-    const roleIds = userRoles.map((r) => r.roleId);
-
-    // Get all app:use permissions for these roles
-    const permissions = await this.db
-      .select({ code: permission.code })
-      .from(rolePermission)
-      .innerJoin(permission, eq(rolePermission.permissionId, permission.id))
-      .where(
-        and(
-          sql`${rolePermission.roleId} = ANY(${roleIds})`,
-          eq(permission.code, 'app:use'),
-          eq(permission.isActive, true)
-        )
-      );
-
-    return permissions.map((p) => p.code);
-  }
-
-  /**
-   * T119: Get apps for a specific group context
-   * Helper method for filtering apps by group access
-   */
-  async getAppsForGroup(
-    userId: string,
-    tenantId: string,
-    groupId: string
-  ): Promise<AppWithContext[]> {
-    // Get all apps in tenant
-    const tenantApps = await this.db
-      .select()
-      .from(app)
-      .where(eq(app.tenantId, tenantId));
-
-    const accessibleApps: AppWithContext[] = [];
-
-    for (const appRecord of tenantApps) {
-      // Check if group has access
-      const hasAccess = await this.checkGroupAccess(appRecord.id, groupId);
-
-      if (hasAccess) {
-        accessibleApps.push({
-          id: appRecord.id,
-          name: appRecord.name,
-          currentGroup: {
-            groupId,
-            groupName: `Group ${groupId.substring(0, 8)}`,
-            hasAccess: true,
-          },
-          availableGroups: [
-            {
-              groupId,
-              groupName: `Group ${groupId.substring(0, 8)}`,
-              hasAccess: true,
-            },
-          ],
-          requiresSwitch: false,
-        });
-      }
-    }
-
-    return accessibleApps;
   }
 
   async hasAppAccess(
@@ -352,37 +360,433 @@ export class AppService implements IAppService {
     appId: string,
     activeGroupId?: string | null
   ): Promise<boolean> {
-    // Check direct user grant
-    const now = new Date();
-    const userDirectGrant = await this.db
-      .select()
-      .from(appGrant)
+    const { availableGroups } = await this.getAppContextOptions(userId, tenantId, appId);
+
+    if (activeGroupId) {
+      const activeGroupOption = availableGroups.find((groupOption) => groupOption.groupId === activeGroupId);
+      if (activeGroupOption) {
+        return activeGroupOption.hasAccess;
+      }
+    }
+
+    return availableGroups.some((groupOption) => groupOption.hasAccess);
+  }
+
+  async getAppsForGroup(
+    userId: string,
+    tenantId: string,
+    groupId: string
+  ): Promise<AppWithContext[]> {
+    const result = await this.getAccessibleApps(userId, tenantId, groupId, { view: "all", limit: 100 });
+    return result.apps.filter((appItem) => appItem.currentGroup?.groupId === groupId);
+  }
+
+  async addFavorite(userId: string, tenantId: string, appId: string): Promise<void> {
+    const exists = await this.appExistsInTenant(tenantId, appId);
+    if (!exists) {
+      throw new AppNotFoundError();
+    }
+
+    const hasAccess = await this.hasAppAccess(userId, tenantId, appId);
+    if (!hasAccess) {
+      throw new AppNotAccessibleError();
+    }
+
+    const existing = await this.db
+      .select({ id: appFavorite.id })
+      .from(appFavorite)
       .where(
         and(
-          eq(appGrant.appId, appId),
-          eq(appGrant.granteeType, 'user'),
-          eq(appGrant.granteeId, userId),
-          eq(appGrant.permission, 'use'),
+          eq(appFavorite.tenantId, tenantId),
+          eq(appFavorite.userId, userId),
+          eq(appFavorite.appId, appId)
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0) {
+      throw new DuplicateFavoriteError();
+    }
+
+    const favoriteCountRows = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(appFavorite)
+      .where(and(eq(appFavorite.tenantId, tenantId), eq(appFavorite.userId, userId)));
+    const favoriteCount = Number(favoriteCountRows[0]?.count ?? 0);
+    if (favoriteCount >= 50) {
+      throw new FavoriteLimitExceededError(50);
+    }
+
+    await this.db.insert(appFavorite).values({
+      tenantId,
+      userId,
+      appId,
+    });
+  }
+
+  async removeFavorite(userId: string, tenantId: string, appId: string): Promise<void> {
+    await this.db
+      .delete(appFavorite)
+      .where(
+        and(
+          eq(appFavorite.tenantId, tenantId),
+          eq(appFavorite.userId, userId),
+          eq(appFavorite.appId, appId)
+        )
+      );
+  }
+
+  async markRecentUse(userId: string, tenantId: string, appId: string): Promise<void> {
+    const exists = await this.appExistsInTenant(tenantId, appId);
+    if (!exists) {
+      throw new AppNotFoundError();
+    }
+
+    const hasAccess = await this.hasAppAccess(userId, tenantId, appId);
+    if (!hasAccess) {
+      throw new AppNotAccessibleError();
+    }
+
+    await this.db
+      .insert(appRecentUse)
+      .values({
+        tenantId,
+        userId,
+        appId,
+        lastUsedAt: new Date(),
+        useCount: 1,
+      })
+      .onConflictDoUpdate({
+        target: [appRecentUse.tenantId, appRecentUse.userId, appRecentUse.appId],
+        set: {
+          lastUsedAt: new Date(),
+          useCount: sql`${appRecentUse.useCount} + 1`,
+        },
+      });
+
+    const cutoff = new Date();
+    cutoff.setUTCDate(cutoff.getUTCDate() - 30);
+
+    await this.db
+      .delete(appRecentUse)
+      .where(
+        and(
+          eq(appRecentUse.tenantId, tenantId),
+          eq(appRecentUse.userId, userId),
+          lt(appRecentUse.lastUsedAt, cutoff)
+        )
+      );
+
+    const rows = await this.db
+      .select({ id: appRecentUse.id })
+      .from(appRecentUse)
+      .where(and(eq(appRecentUse.tenantId, tenantId), eq(appRecentUse.userId, userId)))
+      .orderBy(desc(appRecentUse.lastUsedAt))
+      .limit(100);
+
+    if (rows.length > 10) {
+      const staleIds = rows.slice(10).map((row) => row.id);
+      await this.db
+        .delete(appRecentUse)
+        .where(
+          and(
+            eq(appRecentUse.tenantId, tenantId),
+            eq(appRecentUse.userId, userId),
+            inArray(appRecentUse.id, staleIds)
+          )
+        );
+    }
+  }
+
+  // =============================================================================
+  // Internal helpers
+  // =============================================================================
+
+  private async findTenantApps(tenantId: string, query: AccessibleAppsQuery) {
+    const conditions = [eq(app.tenantId, tenantId), eq(app.status, "active")];
+
+    const keyword = this.normalizeKeyword(query.q);
+    if (keyword) {
+      conditions.push(
+        or(
+          ilike(app.name, `%${keyword}%`),
+          ilike(app.description, `%${keyword}%`),
+          sql`${app.tags}::text ILIKE ${`%${keyword}%`}`
+        ) as any
+      );
+    }
+
+    if (query.category) {
+      conditions.push(eq(app.mode, query.category));
+    }
+
+    return this.db
+      .select({
+        id: app.id,
+        name: app.name,
+        description: app.description,
+        mode: app.mode,
+        icon: app.icon,
+        iconType: app.iconType,
+        isFeatured: app.isFeatured,
+        sortOrder: app.sortOrder,
+        tags: app.tags,
+      })
+      .from(app)
+      .where(and(...conditions))
+      .orderBy(desc(app.isFeatured), asc(app.sortOrder), asc(app.name));
+  }
+
+  private async appExistsInTenant(tenantId: string, appId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: app.id })
+      .from(app)
+      .where(and(eq(app.tenantId, tenantId), eq(app.id, appId)))
+      .limit(1);
+
+    return rows.length > 0;
+  }
+
+  private async getUserGroups(userId: string, tenantId: string): Promise<UserGroupMembership[]> {
+    return this.db
+      .select({
+        groupId: group.id,
+        groupName: group.name,
+      })
+      .from(groupMember)
+      .innerJoin(group, eq(groupMember.groupId, group.id))
+      .where(
+        and(
+          eq(groupMember.userId, userId),
+          eq(group.tenantId, tenantId),
+          sql`${groupMember.removedAt} IS NULL`
+        )
+      )
+      .orderBy(asc(group.name));
+  }
+
+  private async hasGlobalAppUsePermission(userId: string, tenantId: string): Promise<boolean> {
+    const now = new Date();
+
+    const matches = await this.db
+      .select({ permissionId: permission.id })
+      .from(rbacUserRole)
+      .innerJoin(rbacRole, eq(rbacUserRole.roleId, rbacRole.id))
+      .innerJoin(rolePermission, eq(rolePermission.roleId, rbacRole.id))
+      .innerJoin(permission, eq(permission.id, rolePermission.permissionId))
+      .where(
+        and(
+          eq(rbacUserRole.userId, userId),
+          eq(rbacUserRole.tenantId, tenantId),
+          eq(rbacRole.isActive, true),
+          eq(permission.code, "app:use"),
+          eq(permission.isActive, true),
           or(
-            sql`${appGrant.expiresAt} IS NULL`,
-            sql`${appGrant.expiresAt} > ${now}`
+            sql`${rbacUserRole.expiresAt} IS NULL`,
+            sql`${rbacUserRole.expiresAt} > ${now}`
           )
         )
       )
       .limit(1);
 
-    if (userDirectGrant.length > 0) {
-      return true;
+    return matches.length > 0;
+  }
+
+  private async loadAccessMaps(
+    appIds: string[],
+    groupIds: string[],
+    userId: string
+  ): Promise<AccessMaps> {
+    if (appIds.length === 0) {
+      return {
+        userAllow: new Set(),
+        userDeny: new Set(),
+        groupAllow: new Map(),
+        groupDeny: new Map(),
+      };
     }
 
-    // Check group grants
-    if (activeGroupId) {
-      return await this.checkGroupAccess(appId, activeGroupId);
+    const now = new Date();
+
+    const userGrants = await this.db
+      .select({
+        appId: appGrant.appId,
+        permission: appGrant.permission,
+      })
+      .from(appGrant)
+      .where(
+        and(
+          inArray(appGrant.appId, appIds),
+          eq(appGrant.granteeType, "user"),
+          eq(appGrant.granteeId, userId),
+          or(
+            sql`${appGrant.expiresAt} IS NULL`,
+            sql`${appGrant.expiresAt} > ${now}`
+          )
+        )
+      );
+
+    const groupGrants = groupIds.length
+      ? await this.db
+          .select({
+            appId: appGrant.appId,
+            groupId: appGrant.granteeId,
+            permission: appGrant.permission,
+          })
+          .from(appGrant)
+          .where(
+            and(
+              inArray(appGrant.appId, appIds),
+              eq(appGrant.granteeType, "group"),
+              inArray(appGrant.granteeId, groupIds),
+              or(
+                sql`${appGrant.expiresAt} IS NULL`,
+                sql`${appGrant.expiresAt} > ${now}`
+              )
+            )
+          )
+      : [];
+
+    const userAllow = new Set<string>();
+    const userDeny = new Set<string>();
+    const groupAllow = new Map<string, Set<string>>();
+    const groupDeny = new Map<string, Set<string>>();
+
+    for (const grant of userGrants) {
+      if (grant.permission === "deny") {
+        userDeny.add(grant.appId);
+      } else {
+        userAllow.add(grant.appId);
+      }
     }
 
-    // Check role permissions
-    const userPermissions = await this.getUserAppPermissions(userId, tenantId);
-    return userPermissions.includes(appId);
+    for (const grant of groupGrants) {
+      const target = grant.permission === "deny" ? groupDeny : groupAllow;
+      if (!target.has(grant.appId)) {
+        target.set(grant.appId, new Set<string>());
+      }
+      target.get(grant.appId)?.add(grant.groupId);
+    }
+
+    return { userAllow, userDeny, groupAllow, groupDeny };
+  }
+
+  private async getFavoriteMap(
+    tenantId: string,
+    userId: string,
+    appIds: string[]
+  ): Promise<Map<string, Date>> {
+    if (appIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.db
+      .select({
+        appId: appFavorite.appId,
+        createdAt: appFavorite.createdAt,
+      })
+      .from(appFavorite)
+      .where(
+        and(
+          eq(appFavorite.tenantId, tenantId),
+          eq(appFavorite.userId, userId),
+          inArray(appFavorite.appId, appIds)
+        )
+      );
+
+    const map = new Map<string, Date>();
+    for (const row of rows) {
+      map.set(row.appId, row.createdAt);
+    }
+    return map;
+  }
+
+  private async getRecentUseMap(
+    tenantId: string,
+    userId: string,
+    appIds: string[]
+  ): Promise<Map<string, string>> {
+    if (appIds.length === 0) {
+      return new Map();
+    }
+
+    const rows = await this.db
+      .select({
+        appId: appRecentUse.appId,
+        lastUsedAt: appRecentUse.lastUsedAt,
+      })
+      .from(appRecentUse)
+      .where(
+        and(
+          eq(appRecentUse.tenantId, tenantId),
+          eq(appRecentUse.userId, userId),
+          inArray(appRecentUse.appId, appIds)
+        )
+      )
+      .orderBy(desc(appRecentUse.lastUsedAt));
+
+    const map = new Map<string, string>();
+    for (const row of rows) {
+      map.set(row.appId, row.lastUsedAt.toISOString());
+    }
+    return map;
+  }
+
+  private normalizeLimit(limit?: number): number {
+    if (!limit || Number.isNaN(limit)) {
+      return 20;
+    }
+    return Math.min(Math.max(limit, 1), 100);
+  }
+
+  private normalizeKeyword(keyword?: string): string {
+    if (!keyword) {
+      return "";
+    }
+    return keyword.trim().slice(0, 100);
+  }
+
+  private resolveCursorIndex(items: AppWithContext[], cursor?: string): number {
+    if (!cursor) {
+      return 0;
+    }
+    const index = items.findIndex((item) => item.id === cursor);
+    return index >= 0 ? index + 1 : 0;
+  }
+
+  private computeSearchScore(item: AppWithContext, keyword: string): number {
+    const normalized = keyword.toLowerCase();
+    const name = item.name.toLowerCase();
+    const description = (item.description ?? "").toLowerCase();
+    const tags = (item.tags ?? []).map((tag) => tag.toLowerCase());
+
+    let score = 0;
+    if (name === normalized) {
+      score += 200;
+    } else if (name.startsWith(normalized)) {
+      score += 120;
+    } else if (name.includes(normalized)) {
+      score += 80;
+    }
+
+    if (description.includes(normalized)) {
+      score += 40;
+    }
+
+    if (tags.some((tag) => tag === normalized)) {
+      score += 60;
+    } else if (tags.some((tag) => tag.includes(normalized))) {
+      score += 30;
+    }
+
+    return score;
+  }
+
+  private toStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value.map((item) => String(item));
   }
 }
 

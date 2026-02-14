@@ -18,7 +18,7 @@ export const mfaSecret = pgTable(
       .defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => user.id, { onDelete: "cascade"),
+      .references(() => user.id, { onDelete: "cascade" }),
     // Encrypted TOTP secret
     secret: varchar("secret", { length: 255 }).notNull(),
     // Backup codes for recovery (hashed)

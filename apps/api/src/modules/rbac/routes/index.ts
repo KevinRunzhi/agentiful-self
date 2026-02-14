@@ -10,12 +10,15 @@ import { userRolesRoutes } from './user-roles.routes.js';
 import { permissionsRoutes } from './permissions.routes.js';
 import { grantsRoutes } from './grants.routes.js';
 import { breakglassRoutes } from './breakglass.routes.js';
+import { appsRoutes } from './apps.routes.js';
 
 export async function rbacRoutes(fastify: FastifyInstance) {
-  // Register all RBAC route modules
-  await fastify.register(rolesRoutes, { prefix: '/roles' });
-  await fastify.register(userRolesRoutes, { prefix: '/users/:userId/roles' });
-  await fastify.register(permissionsRoutes, { prefix: '/permissions' });
-  await fastify.register(grantsRoutes, { prefix: '/grants' });
-  await fastify.register(breakglassRoutes, { prefix: '/breakglass' });
+  // Route modules already define concrete paths (e.g. /roles, /grants),
+  // so we register them without additional nested prefixes.
+  await fastify.register(rolesRoutes);
+  await fastify.register(userRolesRoutes);
+  await fastify.register(permissionsRoutes);
+  await fastify.register(grantsRoutes);
+  await fastify.register(breakglassRoutes);
+  await fastify.register(appsRoutes);
 }

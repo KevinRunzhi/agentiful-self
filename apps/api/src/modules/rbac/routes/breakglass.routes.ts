@@ -11,7 +11,9 @@
  */
 
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import { getDatabase } from "@agentifui/db/client";
 import { createBreakglassService } from '../services/breakglass.service';
+import { createNotificationService } from "../../notifications/services/notification.service";
 
 // =============================================================================
 // Types
@@ -51,10 +53,11 @@ async function postActivateBreakglass(
   }
 
   try {
+    const db = request.db ?? getDatabase();
     const breakglassService = createBreakglassService(
-      request.db,
+      db,
       request.auditService,
-      request.notificationService
+      createNotificationService(db as any)
     );
 
     const session = await breakglassService.activateBreakglass({
@@ -117,8 +120,9 @@ async function getBreakglassStatus(
   }
 
   try {
+    const db = request.db ?? getDatabase();
     const breakglassService = createBreakglassService(
-      request.db,
+      db,
       request.auditService
     );
 
@@ -161,8 +165,9 @@ async function postExtendBreakglass(
   }
 
   try {
+    const db = request.db ?? getDatabase();
     const breakglassService = createBreakglassService(
-      request.db,
+      db,
       request.auditService
     );
 
@@ -219,8 +224,9 @@ async function deleteBreakglass(
   }
 
   try {
+    const db = request.db ?? getDatabase();
     const breakglassService = createBreakglassService(
-      request.db,
+      db,
       request.auditService
     );
 

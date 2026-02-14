@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./rbac": "./src/rbac/index.ts",
+    "./types": "./src/types/index.ts",
+    "./apps": "./src/apps/index.ts",
+    "./quota": "./src/quota/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit"
   },

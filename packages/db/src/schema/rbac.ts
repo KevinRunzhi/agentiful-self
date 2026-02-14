@@ -12,10 +12,22 @@
  * Manager is NOT a Role - it's determined by GroupMember.role='manager'
  */
 
-import { pgTable, serial, uuid, varchar, text, boolean, timestamp, index, unique } from "drizzle-orm/pg-core";
+import {
+  pgTable,
+  serial,
+  uuid,
+  varchar,
+  text,
+  boolean,
+  timestamp,
+  integer,
+  index,
+  unique,
+  jsonb,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { user } from "./user.js";
 import { tenant } from "./tenant.js";
-import { group } from "./group.js";
 
 // =============================================================================
 // Role - RBAC Role Definitions
@@ -159,14 +171,35 @@ export const app = pgTable(
       .references(() => tenant.id, { onDelete: "cascade" })
       .notNull(),
     name: varchar("name", { length: 255 }).notNull(),
+    externalId: varchar("external_id", { length: 255 }),
+    externalPlatform: varchar("external_platform", { length: 64 }),
+    description: text("description"),
+    mode: varchar("mode", { length: 32 }).default("chat").notNull(), // 'chat' | 'workflow' | 'agent' | 'completion'
+    icon: text("icon"),
+    iconType: varchar("icon_type", { length: 32 }).default("image").notNull(), // 'image' | 'emoji' | 'link'
+    tags: jsonb("tags").$type<string[]>().default([]).notNull(),
+    isFeatured: boolean("is_featured").default(false).notNull(),
+    sortOrder: integer("sort_order").default(0).notNull(),
+    enableApi: boolean("enable_api").default(true).notNull(),
+    apiRpm: integer("api_rpm").default(0).notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
+    createdBy: uuid("created_by").references(() => user.id, { onDelete: "set null" }),
     status: varchar("status", { length: 32 })
       .default("active")
       .notNull(), // 'active' | 'disabled'
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => ({
     tenantIdx: index("idx_app_tenant").on(table.tenantId),
     statusIdx: index("idx_app_status").on(table.status),
+    tenantStatusModeIdx: index("idx_app_tenant_status_mode").on(table.tenantId, table.status, table.mode),
+    searchNameIdx: index("idx_app_search_name").on(table.name),
+    featuredSortIdx: index("idx_app_featured_sort").on(
+      table.tenantId,
+      table.isFeatured,
+      table.sortOrder
+    ),
   })
 );
 
@@ -214,8 +247,6 @@ export const appGrant = pgTable(
     ),
   })
 );
-
-import { sql } from "drizzle-orm";
 
 export type AppGrant = typeof appGrant.$inferSelect;
 export type NewAppGrant = typeof appGrant.$inferInsert;

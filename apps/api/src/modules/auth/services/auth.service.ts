@@ -187,7 +187,7 @@ async function getUserTenantRoles(
 ): Promise<UserRoleWithTenant[]> {
   const db = await import("@agentifui/db/client").then((m) => m.getDatabase());
   const { userRole, tenant } = await import("@agentifui/db/schema");
-  { eq } = await import("drizzle-orm");
+  const { eq } = await import("drizzle-orm");
 
   const results = await db
     .select({

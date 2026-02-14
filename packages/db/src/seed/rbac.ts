@@ -8,15 +8,18 @@
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
+import { and, eq } from 'drizzle-orm';
 import {
   rbacRole,
   permission,
   rolePermission,
   app,
+  appGrant,
 } from '../schema/rbac.js';
 import { user } from '../schema/user.js';
 import { tenant } from '../schema/tenant.js';
+import { group } from '../schema/group.js';
+import { quotaPolicy } from '../schema/quota.js';
 
 // =============================================================================
 // Role Seed Data
@@ -181,23 +184,136 @@ export async function seedSampleApps(db: PostgresJsDatabase) {
     {
       tenantId: tenants[0].id,
       name: 'Customer Service Bot',
+      description: 'Customer support assistant',
+      mode: 'chat',
+      tags: ['support', 'chatbot'],
       status: 'active',
     },
     {
       tenantId: tenants[0].id,
       name: 'Data Analytics Assistant',
+      description: 'Data analysis workflow helper',
+      mode: 'workflow',
+      tags: ['analytics', 'workflow'],
+      status: 'active',
+    },
+    {
+      tenantId: tenants[0].id,
+      name: 'Ops Automation Agent',
+      description: 'Operations agent for routine tasks',
+      mode: 'agent',
+      tags: ['ops', 'automation'],
+      status: 'active',
+    },
+    {
+      tenantId: tenants[0].id,
+      name: 'Executive Summary Generator',
+      description: 'Summarize long-form reports',
+      mode: 'completion',
+      tags: ['summary', 'report'],
       status: 'active',
     },
   ] as const;
 
-  for (const app of sampleApps) {
+  for (const sampleApp of sampleApps) {
     await db
       .insert(app)
-      .values(app)
+      .values(sampleApp)
       .onConflictDoNothing();
   }
 
   console.log(`✓ Seeded ${sampleApps.length} sample apps`);
+}
+
+async function seedSampleAppGrants(db: PostgresJsDatabase) {
+  console.log('Seeding sample app grants...');
+
+  const tenants = await db.select().from(tenant).limit(1);
+  if (tenants.length === 0) {
+    console.log('⚠ No tenants found, skipping app grants');
+    return;
+  }
+
+  const tenantId = tenants[0].id;
+  const defaultGroup = await db
+    .select({ id: group.id })
+    .from(group)
+    .where(eq(group.tenantId, tenantId))
+    .limit(1);
+  const seedOperator = await db.select({ id: user.id }).from(user).limit(1);
+  const apps = await db
+    .select({ id: app.id })
+    .from(app)
+    .where(eq(app.tenantId, tenantId));
+
+  if (defaultGroup.length === 0 || apps.length === 0) {
+    console.log('⚠ No default group/apps found, skipping app grants');
+    return;
+  }
+
+  for (const appRow of apps) {
+    const existing = await db
+      .select({ id: appGrant.id })
+      .from(appGrant)
+      .where(
+        and(
+          eq(appGrant.appId, appRow.id),
+          eq(appGrant.granteeType, 'group'),
+          eq(appGrant.granteeId, defaultGroup[0].id),
+          eq(appGrant.permission, 'use')
+        )
+      )
+      .limit(1);
+    if (existing.length > 0) {
+      continue;
+    }
+
+    await db
+      .insert(appGrant)
+      .values({
+        appId: appRow.id,
+        granteeType: 'group',
+        granteeId: defaultGroup[0].id,
+        permission: 'use',
+        grantedBy: seedOperator[0]?.id ?? null,
+      });
+  }
+
+  console.log(`✓ Seeded ${apps.length} sample app grants`);
+}
+
+async function seedDefaultTenantQuota(db: PostgresJsDatabase) {
+  console.log('Seeding default tenant quota policy...');
+
+  const tenants = await db.select().from(tenant).limit(1);
+  if (tenants.length === 0) {
+    console.log('⚠ No tenants found, skipping default quota');
+    return;
+  }
+
+  await db
+    .insert(quotaPolicy)
+    .values({
+      tenantId: tenants[0].id,
+      scopeType: 'tenant',
+      scopeId: tenants[0].id,
+      metricType: 'token',
+      periodType: 'month',
+      limitValue: 1_000_000,
+      alertThresholds: [80, 90, 100],
+      isActive: true,
+    })
+    .onConflictDoNothing({
+      target: [
+        quotaPolicy.tenantId,
+        quotaPolicy.scopeType,
+        quotaPolicy.scopeId,
+        quotaPolicy.metricType,
+        quotaPolicy.periodType,
+      ],
+    });
+
+  console.log('✓ Seeded default tenant quota policy');
 }
 
 // =============================================================================
@@ -213,6 +329,8 @@ export async function seedRbac(db: PostgresJsDatabase) {
   await seedPermissions(db);
   await seedRolePermissions(db);
   await seedSampleApps(db);
+  await seedSampleAppGrants(db);
+  await seedDefaultTenantQuota(db);
 
   console.log('\n========================================');
   console.log('RBAC seeding completed!');
