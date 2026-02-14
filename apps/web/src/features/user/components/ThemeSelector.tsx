@@ -41,7 +41,12 @@ export function ThemeSelector({ theme, onThemeChange }: ThemeSelectorProps) {
     { value: "system", icon: <MonitorIcon className="w-4 h-4" />, label: "System" },
   ];
 
-  const currentTheme = themes.find((t) => t.value === theme) || themes[2];
+  const fallbackTheme: { value: Theme; icon: React.ReactNode; label: string } = {
+    value: "system",
+    icon: <MonitorIcon className="w-4 h-4" />,
+    label: "System",
+  };
+  const currentTheme = themes.find((t) => t.value === theme) ?? fallbackTheme;
 
   return (
     <div className="relative">

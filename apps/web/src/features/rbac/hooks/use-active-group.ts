@@ -78,7 +78,8 @@ export function useActiveGroup({ tenantId, groups }: UseActiveGroupOptions) {
     }
 
     // Default to first group or Default Group (T026-2)
-    return groups.length > 0 ? groups[0].groupId : null;
+    const [firstGroup] = groups;
+    return firstGroup ? firstGroup.groupId : null;
   });
 
   const activeGroup = groups.find((g) => g.groupId === activeGroupId) || null;
@@ -102,7 +103,10 @@ export function useActiveGroup({ tenantId, groups }: UseActiveGroupOptions) {
   useEffect(() => {
     if (groups.length > 0 && !activeGroupId) {
       // Set to first group if no active group
-      setActiveGroupIdState(groups[0].groupId);
+      const [firstGroup] = groups;
+      if (firstGroup) {
+        setActiveGroupIdState(firstGroup.groupId);
+      }
     } else if (activeGroupId && !groups.some((g) => g.groupId === activeGroupId)) {
       // Clear if active group is no longer in user's groups
       clearActiveGroup();

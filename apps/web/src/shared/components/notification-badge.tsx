@@ -130,7 +130,7 @@ export function NotificationBadge({
   className = '',
   breakglassOnly = false,
 }: NotificationBadgeProps) {
-  const { data: count, isLoading, error } = useNotificationCount();
+  const { data: count, isLoading } = useNotificationCount();
 
   const displayCount = breakglassOnly
     ? count?.breakglass ?? 0

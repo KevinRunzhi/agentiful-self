@@ -6,7 +6,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { UserSession, UserProfile, TenantProfile } from "@agentifui/shared/types";
+import type { UserProfile, TenantProfile } from "@agentifui/shared/types";
 
 /**
  * User session structure

@@ -100,7 +100,7 @@ export class NotificationService {
     const type = normalizeType(notificationInput.type);
     const content = notificationInput.message ?? notificationInput.content ?? "";
     const metadata: Record<string, unknown> = {
-      ...(notificationInput.metadata ?? {}),
+      ...notificationInput.metadata,
       eventType: notificationInput.type,
     };
 

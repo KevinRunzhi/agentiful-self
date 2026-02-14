@@ -162,7 +162,7 @@ export function GroupMemberList({
                       member.role
                     )}`}
                   >
-                    {t(`roles.${member.role}`, member.role)}
+                    {t.has(`roles.${member.role}`) ? t(`roles.${member.role}`) : member.role}
                   </span>
 
                   {/* Actions */}

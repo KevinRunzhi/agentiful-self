@@ -1,21 +1,13 @@
 import Fastify from "fastify";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { traceMiddleware } from "../../src/middleware/trace.middleware";
-import { platformHealthStore } from "../../src/modules/gateway/services/platform-health.store";
-
-const mockHasAppAccess = vi.fn();
-const mockGetAccessibleApps = vi.fn();
 const mockResolveQuotaAttributionGroupId = vi.fn();
 const mockQuotaCheck = vi.fn();
 const mockQuotaDeduct = vi.fn();
 const mockCreateNotification = vi.fn();
-
-vi.mock("../../src/modules/rbac/services/app.service.js", () => ({
-  createAppService: vi.fn(() => ({
-    hasAppAccess: mockHasAppAccess,
-    getAccessibleApps: mockGetAccessibleApps,
-  })),
-}));
+const mockStartExecution = vi.fn();
+const mockCompleteExecution = vi.fn();
+const mockFailExecution = vi.fn();
 
 vi.mock("../../src/modules/quota/repositories/quota.repository", () => ({
   createQuotaRepository: vi.fn(() => ({
@@ -67,33 +59,21 @@ vi.mock("../../src/modules/auth/services/audit.service.js", () => ({
   },
 }));
 
-function createMockDb(appRecord: Record<string, unknown>) {
+vi.mock("../../src/modules/quota/services/execution-persistence.service", async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import("../../src/modules/quota/services/execution-persistence.service")
+    >();
+
   return {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          limit: vi.fn().mockResolvedValue([appRecord]),
-        })),
-      })),
+    ...actual,
+    createExecutionPersistenceService: vi.fn(() => ({
+      startExecution: mockStartExecution,
+      completeExecution: mockCompleteExecution,
+      failExecution: mockFailExecution,
     })),
   };
-}
-
-function buildAppRecord(platform: "dify" | "coze" | "n8n" = "dify") {
-  return {
-    id: "app-1",
-    tenantId: "tenant-1",
-    name: "Gateway App",
-    mode: "chat",
-    status: "active",
-    enableApi: true,
-    externalPlatform: platform,
-    config: {
-      baseUrl: "https://dify.example.com",
-      apiKey: "plain-api-key",
-    },
-  };
-}
+});
 
 describe("gateway /v1/chat/completions", () => {
   let registerChatExecutionRoutes: typeof import("../../src/modules/quota/routes/chat-execution.routes").registerChatExecutionRoutes;
@@ -103,14 +83,14 @@ describe("gateway /v1/chat/completions", () => {
   });
 
   beforeEach(() => {
-    mockHasAppAccess.mockReset();
-    mockGetAccessibleApps.mockReset();
     mockResolveQuotaAttributionGroupId.mockReset();
     mockQuotaCheck.mockReset();
     mockQuotaDeduct.mockReset();
     mockCreateNotification.mockReset();
+    mockStartExecution.mockReset();
+    mockCompleteExecution.mockReset();
+    mockFailExecution.mockReset();
 
-    mockHasAppAccess.mockResolvedValue(true);
     mockResolveQuotaAttributionGroupId.mockResolvedValue({
       groupId: "group-1",
       source: "requested",
@@ -120,10 +100,13 @@ describe("gateway /v1/chat/completions", () => {
       limits: [],
     });
     mockQuotaDeduct.mockResolvedValue(undefined);
-
-    platformHealthStore.recordSuccess("dify");
-    platformHealthStore.recordSuccess("coze");
-    platformHealthStore.recordSuccess("n8n");
+    mockStartExecution.mockResolvedValue({
+      runId: "run-1",
+      conversationId: "conv-1",
+      runType: "generation",
+    });
+    mockCompleteExecution.mockResolvedValue(undefined);
+    mockFailExecution.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -132,29 +115,8 @@ describe("gateway /v1/chat/completions", () => {
   });
 
   it("returns OpenAI-compatible completion payload", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          answer: "hello from dify",
-          message_id: "msg-1",
-          conversation_id: "ext-conv-1",
-          task_id: "task-1",
-          created_at: 1739510400,
-          metadata: {
-            usage: {
-              prompt_tokens: 10,
-              completion_tokens: 15,
-              total_tokens: 25,
-            },
-          },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } }
-      )
-    );
-    vi.stubGlobal("fetch", fetchMock);
-
     const app = Fastify();
-    app.decorate("db", createMockDb(buildAppRecord()) as any);
+    app.decorate("db", {} as any);
     app.addHook("onRequest", traceMiddleware);
     await app.register(registerChatExecutionRoutes, { prefix: "/v1" });
 
@@ -170,12 +132,33 @@ describe("gateway /v1/chat/completions", () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const payload = response.json() as Record<string, unknown>;
+    const payload = response.json() as {
+      object: string;
+      model: string;
+      conversation_id: string;
+      trace_id: string;
+      usage: { total_tokens: number };
+      quota: { attribution: { groupId: string } };
+      run: { traceId: string };
+    };
     expect(payload.object).toBe("chat.completion");
     expect(payload.model).toBe("app-1");
-    expect(payload).toHaveProperty("conversation_id");
-    expect(payload).toHaveProperty("trace_id");
-    expect((payload.usage as Record<string, unknown>).total_tokens).toBe(25);
+    expect(payload.conversation_id).toBe("conv-1");
+    expect(payload.trace_id).toBeTruthy();
+    expect(payload.run.traceId).toBe(payload.trace_id);
+    expect(payload.usage.total_tokens).toBeGreaterThan(0);
+    expect(payload.quota.attribution.groupId).toBe("group-1");
+    expect(mockStartExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        appId: "app-1",
+      })
+    );
+    expect(mockCompleteExecution).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-1",
+        model: "app-1",
+      })
+    );
 
     await app.close();
   });
@@ -188,12 +171,13 @@ describe("gateway /v1/chat/completions", () => {
         scope: "tenant",
         used: 100,
         limit: 100,
+        resetsAt: "2026-03-01T00:00:00.000Z",
       },
       limits: [],
     });
 
     const app = Fastify();
-    app.decorate("db", createMockDb(buildAppRecord()) as any);
+    app.decorate("db", {} as any);
     app.addHook("onRequest", traceMiddleware);
     await app.register(registerChatExecutionRoutes, { prefix: "/v1" });
 
@@ -208,22 +192,25 @@ describe("gateway /v1/chat/completions", () => {
       },
     });
 
-    expect(response.statusCode).toBe(429);
+    expect(response.statusCode).toBe(403);
     const payload = response.json() as {
-      error: { code: string };
+      error: { code: string; trace_id: string };
       traceId: string;
       degraded: boolean;
     };
     expect(payload.error.code).toBe("quota_exceeded");
+    expect(payload.error.trace_id).toBeTruthy();
     expect(payload.traceId).toBeTruthy();
     expect(payload.degraded).toBe(false);
 
     await app.close();
   });
 
-  it("returns degraded error for unsupported platform adapters", async () => {
+  it("returns degraded error when execution start fails", async () => {
+    mockStartExecution.mockRejectedValueOnce(new Error("platform adapter unavailable"));
+
     const app = Fastify();
-    app.decorate("db", createMockDb(buildAppRecord("coze")) as any);
+    app.decorate("db", {} as any);
     app.addHook("onRequest", traceMiddleware);
     await app.register(registerChatExecutionRoutes, { prefix: "/v1" });
 
@@ -240,10 +227,13 @@ describe("gateway /v1/chat/completions", () => {
 
     expect(response.statusCode).toBe(503);
     const payload = response.json() as {
-      error: { code: string };
+      error: { code: string; trace_id: string };
+      traceId: string;
       degraded: boolean;
     };
-    expect(payload.error.code).toBe("service_degraded");
+    expect(payload.error.code).toBe("quota_service_unavailable");
+    expect(payload.error.trace_id).toBeTruthy();
+    expect(payload.traceId).toBeTruthy();
     expect(payload.degraded).toBe(true);
 
     await app.close();

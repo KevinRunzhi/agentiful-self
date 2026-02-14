@@ -77,7 +77,7 @@ export function InviteUserForm({
       // Reset on success
       setEmail("");
       setMessage("");
-    } catch (err) {
+    } catch {
       // Error handled by parent
     }
   };
@@ -125,7 +125,7 @@ export function InviteUserForm({
             >
               {roles.map((r) => (
                 <option key={r} value={r}>
-                  {t(`roles.${r}`, r)}
+                  {t.has(`roles.${r}`) ? t(`roles.${r}`) : r}
                 </option>
               ))}
             </select>

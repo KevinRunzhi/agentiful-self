@@ -100,7 +100,7 @@ export function MFALoginForm({ onSubmit, isLoading = false, error }: MFALoginFor
                 setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                 setInternalError(null);
               }}
-              error={!!displayError}
+              error={displayError ?? undefined}
               disabled={isLoading}
               maxLength={6}
               pattern="\d{6}"

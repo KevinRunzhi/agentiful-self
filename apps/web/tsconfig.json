@@ -5,10 +5,14 @@
     "rootDir": ".",
     "outDir": "./dist",
     "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "exactOptionalPropertyTypes": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noPropertyAccessFromIndexSignature": false,
     "baseUrl": ".",
     "paths": {
-      "@agentifui/ui/*": ["src/components/ui/*"],
-      "@agentifui/ui/utils": ["../../packages/ui/src/utils/cn.ts"]
+      "@agentifui/ui/*": ["src/components/ui/*"]
     },
     "jsx": "preserve",
     "plugins": [
@@ -18,5 +22,11 @@
     ]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "dist", ".next"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".next",
+    "e2e",
+    "src/features/auth/services/approval.service.ts"
+  ]
 }

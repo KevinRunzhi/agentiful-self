@@ -5,7 +5,6 @@
  */
 
 import { userStatusService } from "./user-status.service";
-import { userRepository } from "../../auth/repositories/user.repository";
 import { userRoleRepository } from "../../auth/repositories/user-role.repository";
 import { auditService } from "../../auth/services/audit.service";
 
@@ -166,7 +165,7 @@ export class ApprovalService {
   /**
    * Check if user requires approval based on tenant settings
    */
-  async requiresApproval(tenantId: string): Promise<boolean> {
+  async requiresApproval(_tenantId: string): Promise<boolean> {
     // TODO: Check tenant's customConfig for userApproval requirement
     // For now, default to true
     return true;
@@ -175,7 +174,7 @@ export class ApprovalService {
   /**
    * Skip approval for invited user (if enabled)
    */
-  async canSkipApproval(tenantId: string, invitationToken: string): Promise<boolean> {
+  async canSkipApproval(_tenantId: string, _invitationToken: string): Promise<boolean> {
     // TODO: Check if invitation has skipApproval flag
     return false;
   }

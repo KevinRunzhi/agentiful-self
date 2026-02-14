@@ -4,7 +4,7 @@
  * Page for tenant admins to invite new users
  */
 
-import { Suspense } from "react";
+import * as React from "react";
 import { InviteUserForm } from "../../../../features/admin/components/InviteUserForm";
 import { UserApprovalList } from "../../../../features/admin/components/UserApprovalList";
 import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/Card";
@@ -72,13 +72,13 @@ export default function InviteUsersPage() {
 
         {/* Approval Queue */}
         <div>
-          <Suspense fallback={<div>Loading...</div>}>
+          <React.Suspense fallback={<div>Loading...</div>}>
             <UserApprovalList
               users={pendingUsers}
               onApprove={handleApprove}
               onReject={handleReject}
             />
-          </Suspense>
+          </React.Suspense>
         </div>
       </div>
     </div>

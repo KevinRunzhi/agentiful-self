@@ -5,10 +5,10 @@
  */
 
 import { Suspense } from "react";
-import { UserProfileEditor } from "../../../../features/user/components/UserProfileEditor";
-import { ThemeSelector } from "../../../../features/user/components/ThemeSelector";
-import { Button } from "../../../../components/ui/Button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../../components/ui/Card";
+import { UserProfileEditor } from "../../../features/user/components/UserProfileEditor";
+import { ThemeSelector } from "../../../features/user/components/ThemeSelector";
+import { Button } from "../../../components/ui/Button";
+import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/Card";
 import { ShieldIcon, UserIcon } from "lucide-react";
 
 /**

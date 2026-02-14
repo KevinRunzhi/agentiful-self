@@ -109,6 +109,8 @@ function quotaExceededReply(
       message: detail ? `Quota exceeded at ${detail.scope} scope` : "Quota exceeded",
       trace_id: traceId,
     },
+    traceId,
+    degraded: false,
     level: detail?.scope ?? "unknown",
     current: detail?.used ?? null,
     limit: detail?.limit ?? null,
@@ -124,6 +126,8 @@ function quotaUnavailableReply(reply: FastifyReply, traceId: string, message?: s
       message: message || "Quota service unavailable",
       trace_id: traceId,
     },
+    traceId,
+    degraded: true,
   });
 }
 
@@ -135,6 +139,8 @@ function badRequestReply(reply: FastifyReply, traceId: string, message: string) 
       message,
       trace_id: traceId,
     },
+    traceId,
+    degraded: false,
   });
 }
 
@@ -146,6 +152,8 @@ function invalidActiveGroupReply(reply: FastifyReply, traceId: string) {
       message: "Provided active group is not valid for this user and tenant",
       trace_id: traceId,
     },
+    traceId,
+    degraded: false,
   });
 }
 
@@ -158,7 +166,18 @@ function executionErrorReply(reply: FastifyReply, traceId: string, error: Execut
       message: error.message,
       trace_id: traceId,
     },
+    traceId,
+    degraded: false,
   });
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  return normalized.length > 0 ? normalized : null;
 }
 
 function extractPromptText(body: ChatCompletionRequestBody): string {
@@ -378,8 +397,10 @@ async function chatCompletions(
   const tenantId = body.tenantId ?? getHeaderString(request, "x-tenant-id");
   const userId = body.userId ?? requestUser?.id ?? getHeaderString(request, "x-user-id");
   const requestedGroupId = body.groupId ?? getHeaderString(request, "x-active-group-id");
-  const appId = body.appId ?? "chat.completions";
-  const model = body.model ?? "gpt-4.1-mini";
+  const requestedAppId = normalizeOptionalString(body.appId);
+  const requestedModel = normalizeOptionalString(body.model);
+  const appId = requestedAppId ?? requestedModel ?? "chat.completions";
+  const model = requestedModel ?? appId;
   const promptText = extractPromptText(body);
   const citations = normalizeCitationList(body.citations);
   let executionService: ReturnType<typeof createExecutionPersistenceService> | null = null;
@@ -656,6 +677,9 @@ async function chatCompletions(
         completion_tokens: completionTokens,
         total_tokens: totalTokens,
       },
+      conversation_id: startedExecution.conversationId,
+      trace_id: traceId,
+      traceId,
       run: {
         id: runId,
         status: "completed",

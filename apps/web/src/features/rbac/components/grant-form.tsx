@@ -19,12 +19,6 @@ interface GrantFormProps {
   onCancel?: () => void;
 }
 
-interface GranteeOption {
-  id: string;
-  name: string;
-  type: 'group' | 'user';
-}
-
 // =============================================================================
 // Component
 // =============================================================================

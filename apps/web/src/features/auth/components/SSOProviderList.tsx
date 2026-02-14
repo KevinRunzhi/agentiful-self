@@ -47,7 +47,7 @@ export interface SSOProviderListProps {
  * SSOProviderList component
  */
 export function SSOProviderList({
-  email,
+  email: _email,
   detectedSSO,
   providers = Object.keys(SSO_PROVIDERS),
   isLoading = false,

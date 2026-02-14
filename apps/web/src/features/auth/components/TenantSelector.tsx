@@ -61,8 +61,9 @@ export function TenantSelector({
   const tenants = React.useMemo(() => {
     if (propTenants) return propTenants;
 
-    // TODO: Fetch user tenants from API
-    return session?.user?.tenants || [];
+    const sessionTenants =
+      (session as { user?: { tenants?: TenantMembership[] } } | null)?.user?.tenants ?? [];
+    return sessionTenants;
   }, [propTenants, session]);
 
   const currentTenant = React.useMemo(() => {

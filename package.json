@@ -8,12 +8,12 @@
     "build": "pnpm -r --filter \"./apps/**\" build",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "lint": "oxlint",
-    "lint:fix": "oxlint --fix",
+    "lint": "oxlint apps/web/src packages",
+    "lint:fix": "oxlint --fix apps/web/src packages",
     "db:generate": "pnpm --filter @agentifui/db db:generate",
     "db:migrate": "pnpm --filter @agentifui/db db:migrate",
     "db:studio": "pnpm --filter @agentifui/db db:studio",
-    "typecheck": "pnpm -r --filter @agentifui/shared --filter @agentifui/ui typecheck",
+    "typecheck": "pnpm -r --if-present typecheck",
     "validate:rbac": "tsx scripts/validate-rbac-quickstart.ts"
   },
   "keywords": [

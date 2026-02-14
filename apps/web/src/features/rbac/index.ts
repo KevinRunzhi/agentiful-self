@@ -5,5 +5,5 @@
  */
 
 export * from './hooks/index.js';
-export * from './stores/index.js';
 export * from './components/index.js';
+export { useRbacStore, selectActiveGroupId, selectActiveGroupName, selectUserRoles, useHasRole, useHasPermission } from './stores/rbac.store.js';

@@ -14,7 +14,6 @@ export type { InputProps } from "./Input";
 
 // Label placeholder
 export { Label } from "./Label";
-export type { LabelProps } from "./Label";
 
 // Card placeholder
 export { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "./Card";

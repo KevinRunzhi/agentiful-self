@@ -5,7 +5,6 @@
  */
 
 import { Suspense } from "react";
-import { GroupForm, GroupMemberList } from "../../../features/group/components";
 import { useGroups } from "../../../features/group/hooks";
 import { Button } from "../../../components/ui/Button";
 import { PlusIcon } from "lucide-react";

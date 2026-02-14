@@ -7,7 +7,6 @@
 "use client";
 
 import * as React from "react";
-import { useTranslations } from "next-intl";
 import { Button } from "@agentifui/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle } from "@agentifui/ui/Card";
 import { CheckIcon, XIcon } from "lucide-react";
@@ -54,8 +53,6 @@ export function UserApprovalList({
   onApprove,
   onReject,
 }: UserApprovalListProps) {
-  const t = useTranslations("users.approvals");
-
   const [processingId, setProcessingId] = React.useState<string | null>(null);
 
   /**

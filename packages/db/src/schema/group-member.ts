@@ -4,7 +4,8 @@
  * Many-to-many relationship between Users and Groups with role
  */
 
-import { pgTable, uuid, varchar, timestamp, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, timestamp, index, unique, uniqueIndex } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { group } from "./group.js";
 import { user } from "./user.js";
 
@@ -33,7 +34,9 @@ export const groupMember = pgTable(
     groupIdx: index("idx_group_member_group").on(table.groupId),
     userIdx: index("idx_group_member_user").on(table.userId),
     groupUserUnique: unique("idx_group_member_group_user").on(table.groupId, table.userId),
-    activeMembership: unique("idx_group_member_active").on(table.groupId, table.userId).where(sql`${table.removedAt} IS NULL`),
+    activeMembership: uniqueIndex("idx_group_member_active")
+      .on(table.groupId, table.userId)
+      .where(sql`${table.removedAt} IS NULL`),
   })
 );
 
@@ -53,6 +56,3 @@ export const GROUP_MEMBER_ROLES = {
 } as const;
 
 export type GroupMemberRole = typeof GROUP_MEMBER_ROLES[keyof typeof GROUP_MEMBER_ROLES];
-
-// Import for the where clause
-import { sql } from "drizzle-orm";

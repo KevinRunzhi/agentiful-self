@@ -638,7 +638,7 @@ export async function registerConversationRoutes(
         .header("Content-Type", file.fileType)
         .header(
           "Content-Disposition",
-          `attachment; filename=\"${encodeURIComponent(file.fileName)}\"`
+          `attachment; filename="${encodeURIComponent(file.fileName)}"`
         );
       return reply.send(file.content);
     } catch (error) {
@@ -734,7 +734,7 @@ export async function registerConversationRoutes(
         .header("Content-Type", "text/plain; charset=utf-8")
         .header(
           "Content-Disposition",
-          `attachment; filename=\"${encodeURIComponent(data.title)}.${extension}\"`
+          `attachment; filename="${encodeURIComponent(data.title)}.${extension}"`
         );
       return reply.send(data.content);
     } catch (error) {

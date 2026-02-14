@@ -4,7 +4,7 @@
  * SSO/OAuth configuration per tenant with domain detection
  */
 
-import { pgTable, uuid, varchar, text, boolean, json, timestamp, index, unique } from "drizzle-orm/pg-core";
+import { pgTable, uuid, varchar, boolean, json, timestamp, index, unique } from "drizzle-orm/pg-core";
 import { tenant } from "./tenant.js";
 
 /**

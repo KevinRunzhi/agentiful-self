@@ -6,7 +6,7 @@
  */
 
 import { useState, useCallback, useEffect } from 'react';
-import type { AppContextOptions, AppWithContext } from '@agentifui/shared/rbac';
+import type { ActiveGroupContext } from '@agentifui/shared/rbac';
 
 // =============================================================================
 // Types
@@ -19,7 +19,7 @@ export interface UseAppContextInput {
 export interface UseAppContextResult {
   app: AppWithContext | null;
   shouldSwitch: boolean;
-  contextOptions: AppContextOptions[];
+  contextOptions: ActiveGroupContext[];
   onSwitch: (newGroupId: string) => void;
   onDirectAccess: () => void;
 }
@@ -30,6 +30,14 @@ export interface UseAppContextReturn {
   error: string | null;
   switchContext: (newGroupId: string) => Promise<void>;
   directAccess: () => Promise<void>;
+}
+
+export interface AppWithContext {
+  id: string;
+  name: string;
+  currentGroup: ActiveGroupContext | null;
+  availableGroups: ActiveGroupContext[];
+  requiresSwitch: boolean;
 }
 
 // =============================================================================
@@ -93,8 +101,8 @@ export function useAppContext({ appId }: UseAppContextInput): UseAppContextRetur
    * T124 [US7] Implement dialog-selection logic (multiple authorized groups)
    */
   const determineShouldSwitch = (
-    currentGroup: AppContextOptions | undefined,
-    availableGroups: AppContextOptions[]
+    currentGroup: ActiveGroupContext | null | undefined,
+    availableGroups: ActiveGroupContext[]
   ): boolean => {
     if (!currentGroup) {
       // No current group set - need to show options

@@ -6,7 +6,6 @@
  */
 
 import { pgTable, uuid, varchar, timestamp, jsonb, index } from "drizzle-orm/pg-core";
-import { sql } from "drizzle-orm";
 
 /**
  * Tenant configuration type

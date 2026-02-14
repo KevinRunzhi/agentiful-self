@@ -7,13 +7,12 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@agentifui/ui/Button";
 import { Input } from "@agentifui/ui/Input";
 import { Label } from "@agentifui/ui/Label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@agentifui/ui/Card";
-import { apiClient } from "../../../lib/api-client";
 
 /**
  * Invite accept form data
@@ -183,7 +182,7 @@ export function InviteAcceptForm({ token }: InviteAcceptFormProps) {
 
       // Redirect to login on success
       router.push("/login?accepted=true");
-    } catch (error) {
+    } catch {
       setErrors({
         general: t("errors.networkError"),
       });

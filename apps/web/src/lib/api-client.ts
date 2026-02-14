@@ -9,7 +9,7 @@ import type { AuthSession } from "@agentifui/shared/types";
 /**
  * API client configuration
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env["NEXT_PUBLIC_API_URL"] || "http://localhost:3001";
 
 /**
  * API error class
@@ -184,12 +184,9 @@ export const apiClient = {
 /**
  * Utility to make API calls with current session
  */
-export function withSession<T extends (...args: never[]) => Promise<never>>(
-  fn: T,
+export function withSession<TArgs extends unknown[], TResult>(
+  fn: (...args: [...TArgs, AuthSession | null]) => Promise<TResult>,
   getSession: () => AuthSession | null
-): T {
-  return (async (...args: unknown[]) => {
-    const session = getSession();
-    return fn(...args, session);
-  }) as T;
+): (...args: TArgs) => Promise<TResult> {
+  return (...args: TArgs) => fn(...args, getSession());
 }

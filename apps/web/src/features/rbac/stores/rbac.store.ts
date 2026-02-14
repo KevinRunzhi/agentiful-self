@@ -55,7 +55,7 @@ interface RBACState {
 
 export const useRbacStore = create<RBACState>()(
   persist(
-    (set, get) => ({
+    (set, _get) => ({
       // Initial state
       permissions: {},
       userRoles: [],
@@ -162,7 +162,11 @@ export function useHasPermission(resourceType: string, action: string): boolean 
   // Check if expired
   if (Date.now() > cached.expiresAt) {
     // Remove expired entry
-    useRbacStore.getState().setPermission(key, { allowed: false, reason: 'expired' }, 0);
+    useRbacStore.getState().setPermission(
+      key,
+      { allowed: false, reason: 'expired_grant' },
+      0
+    );
     return null;
   }
 

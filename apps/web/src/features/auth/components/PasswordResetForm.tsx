@@ -7,7 +7,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Button } from "@agentifui/ui/Button";
 import { Input } from "@agentifui/ui/Input";
@@ -65,7 +65,7 @@ export function PasswordResetForm({ token }: PasswordResetFormProps) {
   const router = useRouter();
   const t = useTranslations("auth.passwordReset");
 
-  const [isRequestMode, setIsRequestMode] = React.useState(!token);
+  const [isRequestMode] = React.useState(!token);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);

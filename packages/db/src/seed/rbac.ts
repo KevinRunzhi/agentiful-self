@@ -2,12 +2,10 @@
  * RBAC Seed Data
  *
  * Seed data for RBAC Authorization Model (S1-2)
- * - Predefined roles: root_admin, tenant_admin, user
- * - Predefined permissions: tenant, group, app, conversation categories
- * - Role-Permission associations
  */
 
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
+import type * as schema from '../schema/index.js';
 import { and, eq } from 'drizzle-orm';
 import {
   rbacRole,
@@ -21,9 +19,7 @@ import { tenant } from '../schema/tenant.js';
 import { group } from '../schema/group.js';
 import { quotaPolicy } from '../schema/quota.js';
 
-// =============================================================================
-// Role Seed Data
-// =============================================================================
+type DbClient = PostgresJsDatabase<typeof schema>;
 
 export const ROLES = [
   {
@@ -31,7 +27,7 @@ export const ROLES = [
     displayName: 'ROOT ADMIN',
     description: 'Platform super administrator with cross-tenant access',
     isSystem: true,
-    isActive: false, // Default disabled, requires ENABLE_ROOT_ADMIN=true
+    isActive: false,
   },
   {
     name: 'tenant_admin',
@@ -47,9 +43,9 @@ export const ROLES = [
     isSystem: true,
     isActive: true,
   },
-] as const;
+];
 
-export async function seedRoles(db: PostgresJsDatabase) {
+export async function seedRoles(db: DbClient) {
   console.log('Seeding RBAC roles...');
 
   for (const role of ROLES) {
@@ -59,33 +55,22 @@ export async function seedRoles(db: PostgresJsDatabase) {
       .onConflictDoNothing({ target: rbacRole.name });
   }
 
-  console.log(`✓ Seeded ${ROLES.length} roles`);
+  console.log(`Seeded ${ROLES.length} roles`);
 }
 
-// =============================================================================
-// Permission Seed Data
-// =============================================================================
-
 export const PERMISSIONS = [
-  // Tenant permissions
   { code: 'tenant:manage', name: 'Manage tenant settings', category: 'tenant' },
   { code: 'tenant:view_audit', name: 'View audit logs', category: 'tenant' },
-
-  // Group permissions
   { code: 'group:create', name: 'Create groups', category: 'group' },
   { code: 'group:manage', name: 'Manage group members', category: 'group' },
-
-  // App permissions
   { code: 'app:register', name: 'Register applications', category: 'app' },
   { code: 'app:grant', name: 'Grant application access', category: 'app' },
   { code: 'app:use', name: 'Use applications', category: 'app' },
-
-  // Conversation permissions
   { code: 'conversation:view_others', name: 'View others conversations', category: 'conversation' },
   { code: 'conversation:export', name: 'Export conversations', category: 'conversation' },
-] as const;
+];
 
-export async function seedPermissions(db: PostgresJsDatabase) {
+export async function seedPermissions(db: DbClient) {
   console.log('Seeding RBAC permissions...');
 
   for (const perm of PERMISSIONS) {
@@ -95,22 +80,16 @@ export async function seedPermissions(db: PostgresJsDatabase) {
       .onConflictDoNothing({ target: permission.code });
   }
 
-  console.log(`✓ Seeded ${PERMISSIONS.length} permissions`);
+  console.log(`Seeded ${PERMISSIONS.length} permissions`);
 }
 
-// =============================================================================
-// Role-Permission Associations
-// =============================================================================
-
-export async function seedRolePermissions(db: PostgresJsDatabase) {
+export async function seedRolePermissions(db: DbClient) {
   console.log('Seeding role-permission associations...');
 
-  // Get all permissions
   const allPermissions = await db.select().from(permission);
 
-  // Tenant Admin: All permissions
   const tenantAdminRole = await db.query.rbacRole.findFirst({
-    where: (role, { eq }) => eq(role.name, 'tenant_admin'),
+    where: (role, { eq: eqField }) => eqField(role.name, 'tenant_admin'),
   });
 
   if (tenantAdminRole) {
@@ -123,16 +102,15 @@ export async function seedRolePermissions(db: PostgresJsDatabase) {
         })
         .onConflictDoNothing();
     }
-    console.log(`✓ Tenant Admin: ${allPermissions.length} permissions`);
+    console.log(`Tenant Admin: ${allPermissions.length} permissions`);
   }
 
-  // User: Only app:use permission
   const userRole = await db.query.rbacRole.findFirst({
-    where: (role, { eq }) => eq(role.name, 'user'),
+    where: (role, { eq: eqField }) => eqField(role.name, 'user'),
   });
 
   const appUsePermission = await db.query.permission.findFirst({
-    where: (perm, { eq }) => eq(perm.code, 'app:use'),
+    where: (perm, { eq: eqField }) => eqField(perm.code, 'app:use'),
   });
 
   if (userRole && appUsePermission) {
@@ -143,12 +121,11 @@ export async function seedRolePermissions(db: PostgresJsDatabase) {
         permissionId: appUsePermission.id,
       })
       .onConflictDoNothing();
-    console.log(`✓ User: app:use permission`);
+    console.log('User: app:use permission');
   }
 
-  // ROOT ADMIN: All permissions (when enabled)
   const rootAdminRole = await db.query.rbacRole.findFirst({
-    where: (role, { eq }) => eq(role.name, 'root_admin'),
+    where: (role, { eq: eqField }) => eqField(role.name, 'root_admin'),
   });
 
   if (rootAdminRole) {
@@ -161,28 +138,23 @@ export async function seedRolePermissions(db: PostgresJsDatabase) {
         })
         .onConflictDoNothing();
     }
-    console.log(`✓ ROOT ADMIN: ${allPermissions.length} permissions`);
+    console.log(`ROOT ADMIN: ${allPermissions.length} permissions`);
   }
 }
 
-// =============================================================================
-// Sample App Data (for testing)
-// =============================================================================
-
-export async function seedSampleApps(db: PostgresJsDatabase) {
+export async function seedSampleApps(db: DbClient) {
   console.log('Seeding sample applications...');
 
-  // Get first tenant for sample data
-  const tenants = await db.select().from(tenant).limit(1);
+  const [firstTenant] = await db.select().from(tenant).limit(1);
 
-  if (tenants.length === 0) {
-    console.log('⚠ No tenants found, skipping sample apps');
+  if (!firstTenant) {
+    console.log('No tenants found, skipping sample apps');
     return;
   }
 
   const sampleApps = [
     {
-      tenantId: tenants[0].id,
+      tenantId: firstTenant.id,
       name: 'Customer Service Bot',
       description: 'Customer support assistant',
       mode: 'chat',
@@ -190,7 +162,7 @@ export async function seedSampleApps(db: PostgresJsDatabase) {
       status: 'active',
     },
     {
-      tenantId: tenants[0].id,
+      tenantId: firstTenant.id,
       name: 'Data Analytics Assistant',
       description: 'Data analysis workflow helper',
       mode: 'workflow',
@@ -198,7 +170,7 @@ export async function seedSampleApps(db: PostgresJsDatabase) {
       status: 'active',
     },
     {
-      tenantId: tenants[0].id,
+      tenantId: firstTenant.id,
       name: 'Ops Automation Agent',
       description: 'Operations agent for routine tasks',
       mode: 'agent',
@@ -206,14 +178,14 @@ export async function seedSampleApps(db: PostgresJsDatabase) {
       status: 'active',
     },
     {
-      tenantId: tenants[0].id,
+      tenantId: firstTenant.id,
       name: 'Executive Summary Generator',
       description: 'Summarize long-form reports',
       mode: 'completion',
       tags: ['summary', 'report'],
       status: 'active',
     },
-  ] as const;
+  ];
 
   for (const sampleApp of sampleApps) {
     await db
@@ -222,32 +194,34 @@ export async function seedSampleApps(db: PostgresJsDatabase) {
       .onConflictDoNothing();
   }
 
-  console.log(`✓ Seeded ${sampleApps.length} sample apps`);
+  console.log(`Seeded ${sampleApps.length} sample apps`);
 }
 
-async function seedSampleAppGrants(db: PostgresJsDatabase) {
+async function seedSampleAppGrants(db: DbClient) {
   console.log('Seeding sample app grants...');
 
-  const tenants = await db.select().from(tenant).limit(1);
-  if (tenants.length === 0) {
-    console.log('⚠ No tenants found, skipping app grants');
+  const [firstTenant] = await db.select().from(tenant).limit(1);
+  if (!firstTenant) {
+    console.log('No tenants found, skipping app grants');
     return;
   }
 
-  const tenantId = tenants[0].id;
+  const tenantId = firstTenant.id;
   const defaultGroup = await db
     .select({ id: group.id })
     .from(group)
     .where(eq(group.tenantId, tenantId))
     .limit(1);
+  const [defaultGroupRow] = defaultGroup;
+
   const seedOperator = await db.select({ id: user.id }).from(user).limit(1);
   const apps = await db
     .select({ id: app.id })
     .from(app)
     .where(eq(app.tenantId, tenantId));
 
-  if (defaultGroup.length === 0 || apps.length === 0) {
-    console.log('⚠ No default group/apps found, skipping app grants');
+  if (!defaultGroupRow || apps.length === 0) {
+    console.log('No default group/apps found, skipping app grants');
     return;
   }
 
@@ -259,7 +233,7 @@ async function seedSampleAppGrants(db: PostgresJsDatabase) {
         and(
           eq(appGrant.appId, appRow.id),
           eq(appGrant.granteeType, 'group'),
-          eq(appGrant.granteeId, defaultGroup[0].id),
+          eq(appGrant.granteeId, defaultGroupRow.id),
           eq(appGrant.permission, 'use')
         )
       )
@@ -273,30 +247,30 @@ async function seedSampleAppGrants(db: PostgresJsDatabase) {
       .values({
         appId: appRow.id,
         granteeType: 'group',
-        granteeId: defaultGroup[0].id,
+        granteeId: defaultGroupRow.id,
         permission: 'use',
         grantedBy: seedOperator[0]?.id ?? null,
       });
   }
 
-  console.log(`✓ Seeded ${apps.length} sample app grants`);
+  console.log(`Seeded ${apps.length} sample app grants`);
 }
 
-async function seedDefaultTenantQuota(db: PostgresJsDatabase) {
+async function seedDefaultTenantQuota(db: DbClient) {
   console.log('Seeding default tenant quota policy...');
 
-  const tenants = await db.select().from(tenant).limit(1);
-  if (tenants.length === 0) {
-    console.log('⚠ No tenants found, skipping default quota');
+  const [firstTenant] = await db.select().from(tenant).limit(1);
+  if (!firstTenant) {
+    console.log('No tenants found, skipping default quota');
     return;
   }
 
   await db
     .insert(quotaPolicy)
     .values({
-      tenantId: tenants[0].id,
+      tenantId: firstTenant.id,
       scopeType: 'tenant',
-      scopeId: tenants[0].id,
+      scopeId: firstTenant.id,
       metricType: 'token',
       periodType: 'month',
       limitValue: 1_000_000,
@@ -313,14 +287,10 @@ async function seedDefaultTenantQuota(db: PostgresJsDatabase) {
       ],
     });
 
-  console.log('✓ Seeded default tenant quota policy');
+  console.log('Seeded default tenant quota policy');
 }
 
-// =============================================================================
-// Main Seed Function
-// =============================================================================
-
-export async function seedRbac(db: PostgresJsDatabase) {
+export async function seedRbac(db: DbClient) {
   console.log('\n========================================');
   console.log('Seeding RBAC Authorization Model (S1-2)');
   console.log('========================================\n');

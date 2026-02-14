@@ -88,7 +88,7 @@ async function toBase64(file: File): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
-      const encoded = result.includes(",") ? result.split(",")[1] : result;
+      const encoded = result.includes(",") ? (result.split(",")[1] ?? "") : result;
       resolve(encoded);
     };
     reader.onerror = () => reject(new Error("Failed to read file"));
@@ -438,12 +438,13 @@ export default function AppChatPage() {
             if (parsed.event === "message.done") {
               const payload = JSON.parse(parsed.data) as { content?: string };
               if (typeof payload.content === "string") {
+                const doneContent = payload.content;
                 setMessages((prev) =>
                   prev.map((item) =>
                     item.id === resolvedAssistantId
                       ? {
                           ...item,
-                          content: payload.content,
+                          content: doneContent,
                         }
                       : item
                   )

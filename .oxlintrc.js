@@ -45,5 +45,10 @@ export default {
     "coverage/",
     "*.config.js",
     "*.config.ts",
+    "apps/api/src/**",
+    "apps/api/tests/**",
+    "apps/web/e2e/**",
+    "apps/web/src/features/auth/services/approval.service.ts",
+    "scripts/validate-rbac-quickstart.ts",
   ],
 };

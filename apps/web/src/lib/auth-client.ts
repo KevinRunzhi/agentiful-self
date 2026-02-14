@@ -4,7 +4,7 @@
  * Client-side authentication utilities
  */
 
-import type { AuthSession, UserProfile } from "@agentifui/shared/types";
+import type { AuthSession } from "@agentifui/shared/types";
 
 /**
  * better-auth client instance

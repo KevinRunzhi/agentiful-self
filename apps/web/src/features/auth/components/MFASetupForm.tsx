@@ -130,7 +130,7 @@ export function MFASetupForm({
                     setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                     setError(null);
                   }}
-                  error={!!error}
+                  error={error ?? undefined}
                   disabled={isLoading}
                   maxLength={6}
                   pattern="\d{6}"

@@ -112,6 +112,7 @@ export interface BreakglassNotification {
   message: string;
   metadata: {
     rootAdminId: string;
+    rootAdminName?: string;
     reason: string;
     expiresAt: Date;
   };

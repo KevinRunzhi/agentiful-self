@@ -8,9 +8,9 @@
 
 import { describe, bench, beforeEach, afterEach } from 'vitest';
 import type { PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { createPermissionService } from '../../../src/modules/rbac/services/permission.service';
-import { createActiveGroupService } from '../../../src/modules/rbac/services/active-group.service';
-import { createAppService } from '../../../src/modules/rbac/services/app.service';
+import { createPermissionService } from '../../src/modules/rbac/services/permission.service';
+import { createActiveGroupService } from '../../src/modules/rbac/services/active-group.service';
+import { createAppService } from '../../src/modules/rbac/services/app.service';
 import {
   rbacRole,
   permission,
