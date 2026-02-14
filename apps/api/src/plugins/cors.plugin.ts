@@ -45,9 +45,12 @@ export const corsPlugin: FastifyPluginAsync = fp(async (app) => {
       "Authorization",
       "x-request-id",
       "x-trace-id",
+      "traceparent",
       "x-tenant-id",
+      "x-user-id",
+      "x-active-group-id",
     ],
-    exposedHeaders: ["x-request-id", "x-trace-id"],
+    exposedHeaders: ["x-request-id", "x-trace-id", "traceparent"],
     maxAge: 86400, // 24 hours
   });
 });

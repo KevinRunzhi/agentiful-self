@@ -85,10 +85,11 @@ describe("T043 [US4] degraded mode guard behavior", () => {
     expect(reply.payload).toEqual({
       error: {
         type: "service_unavailable",
-        code: "quota_guard_degraded_deny_new",
+        code: "service_degraded",
         message: "quota redis unavailable",
-        trace_id: "trace-chat",
       },
+      traceId: "trace-chat",
+      degraded: true,
     });
   });
 
