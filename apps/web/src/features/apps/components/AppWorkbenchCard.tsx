@@ -9,6 +9,7 @@ export interface AppWorkbenchCardProps {
   recentPending?: boolean;
   onToggleFavorite: (appId: string, isFavorite: boolean | undefined) => void;
   onNewConversation: (appId: string) => void;
+  onViewRuns: (appId: string) => void;
 }
 
 function formatLastUsedAt(value: string | null | undefined): string {
@@ -31,6 +32,7 @@ export function AppWorkbenchCard({
   recentPending = false,
   onToggleFavorite,
   onNewConversation,
+  onViewRuns,
 }: AppWorkbenchCardProps) {
   return (
     <Card data-testid={`app-card-${app.id}`}>
@@ -68,16 +70,26 @@ export function AppWorkbenchCard({
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-muted-foreground">{formatLastUsedAt(app.lastUsedAt)}</span>
 
-          <Button
-            type="button"
-            data-testid={`direct-access-${app.id}`}
-            size="sm"
-            variant="outline"
-            disabled={degraded || recentPending}
-            onClick={() => onNewConversation(app.id)}
-          >
-            New Conversation
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => onViewRuns(app.id)}
+            >
+              Runs
+            </Button>
+            <Button
+              type="button"
+              data-testid={`direct-access-${app.id}`}
+              size="sm"
+              variant="outline"
+              disabled={degraded || recentPending}
+              onClick={() => onNewConversation(app.id)}
+            >
+              New Conversation
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

@@ -6,9 +6,11 @@ import {
   AppWorkbenchCard,
   AppsSearchFilters,
   AppsViewTabs,
+  RunRecordsDialog,
 } from "../../../features/apps/components";
 import {
   useAppFavorites,
+  useAppRuns,
   useAppRecent,
   useAppsWorkbench,
 } from "../../../features/apps/hooks";
@@ -22,6 +24,7 @@ const DEGRADED_CODES = new Set([
 export default function AppsPage() {
   const router = useRouter();
   const [degraded, setDegraded] = useState(false);
+  const [runAppId, setRunAppId] = useState<string | null>(null);
   const {
     view,
     setView,
@@ -44,6 +47,15 @@ export default function AppsPage() {
     isPending: isRecentPending,
     error: recentError,
   } = useAppRecent();
+  const {
+    runs,
+    selectedRun,
+    isLoading: isRunLoading,
+    isDetailLoading,
+    error: runError,
+    selectRun,
+    refresh: refreshRuns,
+  } = useAppRuns(runAppId, Boolean(runAppId));
 
   const onToggleFavorite = useCallback(
     (appId: string, isFavorite: boolean | undefined) => {
@@ -77,8 +89,13 @@ export default function AppsPage() {
   );
 
   const error = useMemo(
-    () => loadError ?? favoriteError ?? recentError,
-    [favoriteError, loadError, recentError]
+    () => loadError ?? favoriteError ?? recentError ?? runError,
+    [favoriteError, loadError, recentError, runError]
+  );
+
+  const selectedRunApp = useMemo(
+    () => apps.find((appItem) => appItem.id === runAppId) ?? null,
+    [apps, runAppId]
   );
 
   return (
@@ -137,10 +154,28 @@ export default function AppsPage() {
               recentPending={isRecentPending(app.id)}
               onToggleFavorite={onToggleFavorite}
               onNewConversation={(appId) => void onNewConversation(appId)}
+              onViewRuns={(appId) => setRunAppId(appId)}
             />
           ))}
         </section>
       ) : null}
+
+      <RunRecordsDialog
+        open={Boolean(runAppId)}
+        appName={selectedRunApp?.name ?? "App"}
+        runs={runs}
+        selectedRun={selectedRun}
+        isLoading={isRunLoading}
+        isDetailLoading={isDetailLoading}
+        error={runError}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRunAppId(null);
+          }
+        }}
+        onSelectRun={selectRun}
+        onRefresh={refreshRuns}
+      />
     </main>
   );
 }

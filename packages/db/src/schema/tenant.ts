@@ -44,6 +44,12 @@ export type TenantConfig = {
   defaultLanguage?: string; // Default 'en'
   // Theme preference
   defaultTheme?: "light" | "dark" | "system"; // Default 'system'
+  // Security settings
+  security?: {
+    promptInjection?: {
+      action?: "log" | "alert" | "block";
+    };
+  };
 };
 
 /**
