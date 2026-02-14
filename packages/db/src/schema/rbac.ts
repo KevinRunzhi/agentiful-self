@@ -186,7 +186,8 @@ export const app = pgTable(
     createdBy: uuid("created_by").references(() => user.id, { onDelete: "set null" }),
     status: varchar("status", { length: 32 })
       .default("active")
-      .notNull(), // 'active' | 'disabled'
+      .notNull(), // 'active' | 'disabled' | 'deleted'
+    deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

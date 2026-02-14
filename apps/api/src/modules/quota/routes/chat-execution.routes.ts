@@ -26,6 +26,11 @@ import {
 } from "../services/quota-attribution.service";
 import { createQuotaCheckService } from "../services/quota-check.service";
 import { QuotaDeductExceededError, createQuotaDeductService } from "../services/quota-deduct.service";
+import {
+  createExecutionPersistenceService,
+  ExecutionHttpError,
+  type CitationPayload,
+} from "../services/execution-persistence.service";
 
 type MeteringMode = "token" | "request";
 
@@ -39,6 +44,9 @@ interface ChatCompletionRequestBody {
   userId?: string;
   groupId?: string | null;
   appId?: string;
+  conversationId?: string;
+  conversationClientId?: string;
+  messageClientId?: string;
   model?: string;
   meteringMode?: MeteringMode;
   estimatedUsage?: number;
@@ -46,6 +54,7 @@ interface ChatCompletionRequestBody {
   completionTokens?: number;
   maxTokens?: number;
   messages?: ChatMessagePayload[];
+  citations?: CitationPayload[];
 }
 
 const QUOTA_CHECK_TIMEOUT_MS = 2_000;
@@ -138,6 +147,69 @@ function invalidActiveGroupReply(reply: FastifyReply, traceId: string) {
       trace_id: traceId,
     },
   });
+}
+
+function executionErrorReply(reply: FastifyReply, traceId: string, error: ExecutionHttpError) {
+  const type = error.statusCode >= 500 ? "server_error" : "invalid_request_error";
+  return reply.status(error.statusCode).send({
+    error: {
+      type,
+      code: error.code,
+      message: error.message,
+      trace_id: traceId,
+    },
+  });
+}
+
+function extractPromptText(body: ChatCompletionRequestBody): string {
+  const latestUserMessage = [...(body.messages ?? [])]
+    .reverse()
+    .find((message) => message.role === "user" && typeof message.content === "string");
+
+  return latestUserMessage?.content?.trim() ?? "";
+}
+
+function normalizeCitationList(input: CitationPayload[] | undefined): CitationPayload[] {
+  if (!Array.isArray(input) || input.length === 0) {
+    return [];
+  }
+
+  const normalized: CitationPayload[] = [];
+  for (const item of input) {
+    if (!item || typeof item !== "object") {
+      continue;
+    }
+
+    const id = typeof item.id === "string" ? item.id.trim() : "";
+    const title = typeof item.title === "string" ? item.title.trim() : "";
+    const snippet = typeof item.snippet === "string" ? item.snippet.trim() : "";
+    if (!id || !title || !snippet) {
+      continue;
+    }
+
+    let safeUrl: string | undefined;
+    if (typeof item.url === "string" && item.url.trim()) {
+      try {
+        const parsed = new URL(item.url);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          safeUrl = parsed.toString();
+        }
+      } catch {
+        // Ignore malformed citation URLs.
+      }
+    }
+
+    normalized.push({
+      id,
+      title,
+      snippet,
+      url: safeUrl,
+      score: typeof item.score === "number" ? item.score : undefined,
+      documentName: typeof item.documentName === "string" ? item.documentName : undefined,
+    });
+  }
+
+  return normalized;
 }
 
 function estimatePromptTokens(body: ChatCompletionRequestBody): number {
@@ -308,6 +380,10 @@ async function chatCompletions(
   const requestedGroupId = body.groupId ?? getHeaderString(request, "x-active-group-id");
   const appId = body.appId ?? "chat.completions";
   const model = body.model ?? "gpt-4.1-mini";
+  const promptText = extractPromptText(body);
+  const citations = normalizeCitationList(body.citations);
+  let executionService: ReturnType<typeof createExecutionPersistenceService> | null = null;
+  let startedExecution: { runId: string; conversationId: string; runType: string } | null = null;
 
   if (!tenantId || !userId) {
     return badRequestReply(reply, traceId, "tenantId and userId are required");
@@ -322,6 +398,7 @@ async function chatCompletions(
     }
 
     const quotaRepository = createQuotaRepository(db as any);
+    executionService = createExecutionPersistenceService(db as any);
     const quotaCheckService = createQuotaCheckService(quotaRepository);
 
     let attribution;
@@ -390,11 +467,44 @@ async function chatCompletions(
       );
     }
 
-    markQuotaServiceHealthy(request.server, "chat_completions");
+    startedExecution = await executionService.startExecution({
+      tenantId,
+      userId,
+      appId,
+      activeGroupId: attribution.groupId,
+      traceId,
+      conversationId: body.conversationId,
+      conversationClientId: body.conversationClientId,
+      messageClientId: body.messageClientId,
+      promptText,
+      payload: {
+        messages: body.messages ?? [],
+        model,
+      },
+    });
 
+    const runId = startedExecution.runId;
     const totalTokens = promptTokens + completionTokens;
-    const runId = `run_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const createdAt = Math.floor(Date.now() / 1000);
+    const assistantContent = promptText
+      ? `Processed request: ${promptText.slice(0, 200)}`
+      : "Execution completed successfully.";
+
+    await executionService.completeExecution({
+      runId,
+      tenantId,
+      userId,
+      appId,
+      conversationId: startedExecution.conversationId,
+      traceId,
+      model,
+      content: assistantContent,
+      inputTokens: promptTokens,
+      outputTokens: completionTokens,
+      citations,
+    });
+
+    markQuotaServiceHealthy(request.server, "chat_completions");
 
     // Deduct asynchronously after response is generated to mimic run.completed event consumption.
     void Promise.resolve().then(async () => {
@@ -536,7 +646,7 @@ async function chatCompletions(
           index: 0,
           message: {
             role: "assistant",
-            content: "S1-3 execution entry placeholder response.",
+            content: assistantContent,
           },
           finish_reason: "stop",
         },
@@ -549,6 +659,13 @@ async function chatCompletions(
       run: {
         id: runId,
         status: "completed",
+        type: startedExecution.runType,
+        traceId,
+        conversationId: startedExecution.conversationId,
+      },
+      citations,
+      conversation: {
+        id: startedExecution.conversationId,
       },
       quota: {
         meteringMode,
@@ -559,6 +676,15 @@ async function chatCompletions(
       },
     });
   } catch (error) {
+    if (error instanceof ExecutionHttpError) {
+      return executionErrorReply(reply, traceId, error);
+    }
+
+    if (startedExecution?.runId && executionService) {
+      const failureMessage = error instanceof Error ? error.message : "Execution failed";
+      await executionService.failExecution(startedExecution.runId, failureMessage);
+    }
+
     const message = error instanceof Error ? error.message : "Quota execution failed";
     markQuotaServiceDegraded(request.server, message, "chat_completions");
     if (error instanceof QuotaCheckTimeoutError) {

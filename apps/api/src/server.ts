@@ -24,6 +24,7 @@ import { registerNotificationRoutes } from "./modules/notifications/routes/index
 import { createNotificationService } from "./modules/notifications/services/notification.service.js";
 import { registerQuotaRoutes } from "./modules/quota/routes/index.js";
 import { registerChatExecutionRoutes } from "./modules/quota/routes/chat-execution.routes.js";
+import { registerRunRoutes } from "./modules/quota/routes/run.routes.js";
 import { createQuotaRepository } from "./modules/quota/repositories/quota.repository.js";
 
 /**
@@ -89,6 +90,9 @@ async function main() {
 
   // OpenAI-compatible execution entry
   await app.register(registerChatExecutionRoutes, { prefix: "/v1" });
+
+  // Execution run list/detail/sync APIs
+  await app.register(registerRunRoutes, { prefix: "/v1" });
 
   // Notification retention cleanup (90 days)
   try {

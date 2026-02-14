@@ -2,6 +2,10 @@ import type {
   AccessibleApp,
   AccessibleAppsResponsePayload,
   AppsCategory,
+  RunDetail,
+  RunDetailResponsePayload,
+  RunsResponsePayload,
+  RunSummary,
   WorkbenchView,
 } from "../types";
 
@@ -23,11 +27,31 @@ export interface MarkRecentUseResult {
   errorMessage?: string;
 }
 
+export interface FetchRunsInput {
+  appId: string;
+  signal?: AbortSignal;
+}
+
+interface ApiErrorPayload {
+  errors?: Array<{
+    code?: string;
+    message?: string;
+  }>;
+  error?: {
+    code?: string;
+    message?: string;
+  };
+}
+
 function normalizeItems(payload: AccessibleAppsResponsePayload): AccessibleApp[] {
   return payload.data?.items ?? payload.data?.apps ?? [];
 }
 
-function normalizeError(payload: AccessibleAppsResponsePayload): {
+function normalizeRunItems(payload: RunsResponsePayload): RunSummary[] {
+  return payload.data?.items ?? [];
+}
+
+function normalizeError(payload: ApiErrorPayload): {
   code: string;
   message: string;
 } {
@@ -115,4 +139,41 @@ export async function markRecentUse(appId: string): Promise<MarkRecentUseResult>
       errorMessage: "Failed to start conversation",
     };
   }
+}
+
+export async function fetchRuns(input: FetchRunsInput): Promise<RunSummary[]> {
+  const params = new URLSearchParams({ appId: input.appId });
+  const response = await fetch(`/v1/runs?${params.toString()}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    ...(input.signal ? { signal: input.signal } : {}),
+  });
+
+  const payload = (await response.json()) as RunsResponsePayload;
+  if (!response.ok) {
+    const error = normalizeError(payload);
+    throw new Error(error.message);
+  }
+
+  return normalizeRunItems(payload);
+}
+
+export async function fetchRunDetail(runId: string, signal?: AbortSignal): Promise<RunDetail> {
+  const response = await fetch(`/v1/runs/${runId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    ...(signal ? { signal } : {}),
+  });
+
+  const payload = (await response.json()) as RunDetailResponsePayload;
+  if (!response.ok || !payload.data) {
+    const error = normalizeError(payload);
+    throw new Error(error.message);
+  }
+
+  return payload.data;
 }
