@@ -18,3 +18,4 @@ export * from "./mfa-secret.js";
 export * from "./rbac.js";
 export * from "./quota.js";
 export * from "./conversation.js";
+export * from "./compliance.js";
